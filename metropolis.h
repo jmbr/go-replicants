@@ -9,7 +9,7 @@ struct metropolis;
 
 typedef void *state;
 
-typedef state (*generator_fn)(const struct metropolis *, state);
+typedef state (*generator_fn)(state);
 
 typedef double (*pi_fn)(state);
 

@@ -50,7 +50,7 @@ state metropolis_iteration(const struct metropolis *self, state current_state)
 {
         assert(self);
 
-        state candidate = self->generator(self, current_state);
+        state candidate = self->generator(current_state);
 
         return (metropolis_random(self) < self->pi(candidate)/self->pi(current_state))
                 ? candidate
