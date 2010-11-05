@@ -1,7 +1,8 @@
 #ifndef METROPOLIS_H
 #define METROPOLIS_H
-/*
- * metropolis.h -- Interface to the Metropolis-Hastings algorithm.
+/**
+ * @file metropolis.h
+ * @brief Interface to the Metropolis-Hastings algorithm.
  */
 
 struct metropolis;

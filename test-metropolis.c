@@ -1,5 +1,6 @@
-/*
- * test-metropolis.c -- Unit test for the implementation of the Metropolis-Hastings algorithm.
+/**
+ * @file test-metropolis.c
+ * @brief Unit test for the implementation of the Metropolis-Hastings algorithm.
  */
 
 #include <stdio.h>

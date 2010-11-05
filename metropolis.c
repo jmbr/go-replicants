@@ -1,5 +1,6 @@
-/*
- * metropolis.c -- Implementation of the Metropolis-Hastings algorithm.
+/**
+ * @file metropolis.c
+ * @brief Implementation of the Metropolis-Hastings algorithm.
  */
 
 #include <stdlib.h>
