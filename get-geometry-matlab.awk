@@ -6,7 +6,7 @@ BEGIN {
 }
 
 /^ATOM.*CA/ {
-  printf("%3.3g, %3.3g, %3.3g;", $7, $8, $9);
+  printf("%g, %g, %g;", $7, $8, $9);
   ++num_alpha_carbons;
 }
 
