@@ -17,7 +17,7 @@ static gsl_rng *rng;
 const double ratio_of_zeros_to_ones = 0.1;
 
 
-static metropolis_state gen(metropolis_state previous)
+static metropolis_state gen(metropolis_state __attribute__((unused)) previous)
 {
         return (metropolis_state) (((int) round(gsl_rng_uniform(rng)*10)) % 2);
 }
@@ -43,6 +43,7 @@ int main(void)
         }
 
         delete_metropolis(m);
+        gsl_rng_free(rng);
         exit((fabs(output[0]/num_iters - ratio_of_zeros_to_ones) < 1e-2)
              ? EXIT_SUCCESS : EXIT_FAILURE);
 }
