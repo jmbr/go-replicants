@@ -2,6 +2,7 @@
  * metropolis.c -- Implementation of the Metropolis-Hastings algorithm.
  */
 
+#include <stdlib.h>
 #include <assert.h>
 #include <gsl/gsl_rng.h>
 
@@ -10,18 +11,25 @@
 
 struct metropolis {
         gsl_rng *rng;
-        generator_fn generator;
-        pi_fn pi;
+        metropolis_generator generator;
+        metropolis_pi pi;
 };
 
+
 struct metropolis *new_metropolis(unsigned int seed,
-                                  generator_fn generator,
-                                  pi_fn pi)
+                                  metropolis_generator generator,
+                                  metropolis_pi pi)
 {
         struct metropolis *m;
 
-        m = malloc(sizeof(struct metropolis)); /* XXX */
-        m->rng = gsl_rng_alloc(gsl_rng_mt19937);
+        if ((m = malloc(sizeof(struct metropolis))) == NULL)
+                return NULL;
+
+        if ((m->rng = gsl_rng_alloc(gsl_rng_mt19937)) == NULL) {
+                free(m);
+                return NULL;
+        }
+
         gsl_rng_set(m->rng, seed);
         m->generator = generator;
         m->pi = pi;
@@ -33,7 +41,7 @@ void delete_metropolis(struct metropolis *self)
 {
         assert(self);
         assert(self->rng);
-        
+
         gsl_rng_free(self->rng);
         free(self);
 }
@@ -46,11 +54,11 @@ double metropolis_random(const struct metropolis *self)
         return gsl_rng_uniform(self->rng);
 }
 
-state metropolis_iteration(const struct metropolis *self, state current_state)
+metropolis_state metropolis_iteration(const struct metropolis *self, metropolis_state current_state)
 {
         assert(self);
 
-        state candidate = self->generator(current_state);
+        metropolis_state candidate = self->generator(current_state);
 
         return (metropolis_random(self) < self->pi(candidate)/self->pi(current_state))
                 ? candidate

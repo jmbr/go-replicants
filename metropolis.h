@@ -7,18 +7,18 @@
 struct metropolis;
 
 
-typedef void *state;
+typedef void *metropolis_state;
 
-typedef state (*generator_fn)(state);
+typedef metropolis_state (*metropolis_generator)(metropolis_state);
 
-typedef double (*pi_fn)(state);
+typedef double (*metropolis_pi)(metropolis_state);
 
 
-extern struct metropolis *new_metropolis(unsigned int seed, generator_fn generator, pi_fn pi);
+extern struct metropolis *new_metropolis(unsigned int seed, metropolis_generator generator, metropolis_pi pi);
 
 extern void delete_metropolis(struct metropolis *self);
 
 extern double metropolis_random(const struct metropolis *self);
 
-extern state metropolis_iteration(const struct metropolis *self, state current_state);
+extern metropolis_state metropolis_iteration(const struct metropolis *self, metropolis_state current_state);
 #endif // !METROPOLIS_H

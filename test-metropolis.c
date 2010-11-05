@@ -1,10 +1,9 @@
 /*
- * test-metropolis.c -- Unit tests for the implementation of the Metropolis-Hastings algorithm.
+ * test-metropolis.c -- Unit test for the implementation of the Metropolis-Hastings algorithm.
  */
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/types.h>
 #include <math.h>
 #include <time.h>
 
@@ -15,23 +14,25 @@
 
 static gsl_rng *rng;
 
+const double ratio_of_zeros_to_ones = 0.1;
 
-static state gen(state previous)
+
+static metropolis_state gen(metropolis_state previous)
 {
-        return (state) (((int) round(gsl_rng_uniform(rng)*10)) % 2);
+        return (metropolis_state) (((int) round(gsl_rng_uniform(rng)*10)) % 2);
 }
 
-static double pi(state x)
+static double pi(metropolis_state x)
 {
-        return ((int) x == 0) ? 1.0 : 9.0;
+        return ((int) x == 0) ? ratio_of_zeros_to_ones : (1 - ratio_of_zeros_to_ones);
 }
 
-int main(int argc, char *argv[])
+int main(void)
 {
         struct metropolis *m = new_metropolis(time(NULL), gen, pi);
         double output[2] = {0, 0};
-        const unsigned num_iters = 1e7;
-        state s = (state) 0;
+        const int num_iters = 1000000; /* 10^6 */
+        metropolis_state s = (metropolis_state) 0;
 
         rng = gsl_rng_alloc(gsl_rng_mt19937);
         gsl_rng_set(rng, time(NULL));
@@ -42,5 +43,6 @@ int main(int argc, char *argv[])
         }
 
         delete_metropolis(m);
-        exit((fabs(output[0]/num_iters - 0.1) < 1e-2) ? EXIT_SUCCESS : EXIT_FAILURE);
+        exit((fabs(output[0]/num_iters - ratio_of_zeros_to_ones) < 1e-2)
+             ? EXIT_SUCCESS : EXIT_FAILURE);
 }
