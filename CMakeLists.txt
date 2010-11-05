@@ -10,7 +10,7 @@ include_directories(${INCLUDE_DIRECTORIES} ${GSL_INCLUDE_DIRS})
 link_directories(${LINK_DIRECTORIES} ${GSL_LINK_DIRECTORIES})
 
 add_executable(test-metropolis test-metropolis.c metropolis.c metropolis.h)
-add_executable(test-molecule test-molecule.c molecule.c molecule.h molecule-private.h xalloc.c xalloc.h error.c error.h)
+add_executable(test-molecule test-molecule.c molecule.c molecule.h xalloc.c xalloc.h error.c error.h)
 
 target_link_libraries(test-metropolis ${GSL_LIBRARIES})
 
