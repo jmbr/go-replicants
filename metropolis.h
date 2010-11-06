@@ -21,5 +21,7 @@ extern void delete_metropolis(struct metropolis *self);
 
 extern double metropolis_random(const struct metropolis *self);
 
-extern metropolis_state metropolis_iteration(const struct metropolis *self, metropolis_state current_state);
+extern metropolis_state metropolis_iteration(struct metropolis *self, metropolis_state current_state);
+
+extern double metropolis_get_acceptance_ratio(const struct metropolis *self);
 #endif // !METROPOLIS_H

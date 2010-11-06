@@ -4,6 +4,7 @@
  */
 
 #include <stdlib.h>
+#include <stdint.h>
 #include <assert.h>
 #include <gsl/gsl_rng.h>
 
@@ -14,6 +15,7 @@ struct metropolis {
         gsl_rng *rng;
         metropolis_generator generator;
         metropolis_pi pi;
+        uint_fast32_t accepted, total;
 };
 
 
@@ -34,6 +36,8 @@ struct metropolis *new_metropolis(unsigned int seed,
         gsl_rng_set(m->rng, seed);
         m->generator = generator;
         m->pi = pi;
+        m->accepted = 0;
+        m->total = 0;
 
         return m;
 }
@@ -55,13 +59,26 @@ double metropolis_random(const struct metropolis *self)
         return gsl_rng_uniform(self->rng);
 }
 
-metropolis_state metropolis_iteration(const struct metropolis *self, metropolis_state current_state)
+metropolis_state metropolis_iteration(struct metropolis *self, metropolis_state current_state)
 {
         assert(self);
 
         metropolis_state candidate = self->generator(current_state);
 
-        return (metropolis_random(self) < self->pi(candidate)/self->pi(current_state))
-                ? candidate
-                : current_state;
+        ++self->total;
+
+        if (metropolis_random(self) < self->pi(candidate)/self->pi(current_state)) {
+                ++self->accepted;
+                return candidate;
+        } else {
+                return current_state;
+        }
+}
+
+
+double metropolis_get_acceptance_ratio(const struct metropolis *self)
+{
+        assert(self != NULL);
+
+        return ((double) self->accepted)/((double) self->total);
 }
