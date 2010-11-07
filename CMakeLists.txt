@@ -13,11 +13,17 @@ list(REMOVE_ITEM GSL_LIBRARIES -lgslcblas)
 list(APPEND GSL_LIBRARIES -lblas) # Use default BLAS (ATLAS).
 link_directories(${GSL_LINK_DIRECTORIES})
 
+add_executable(test-bitset test-bitset.c bitset.c bitset.h)
 add_executable(test-metropolis test-metropolis.c metropolis.c metropolis.h)
-add_executable(test-molecule test-molecule.c molecule.c molecule.h xalloc.c xalloc.h error.c error.h)
+add_executable(test-protein test-protein.c protein.c protein.h)
+# add_executable(test-geometry test-geometry.c gnuplot-interface.c gnuplot-interface.h)
 
 target_link_libraries(test-metropolis ${GSL_LIBRARIES})
+# target_link_libraries(test-geometry ${GSL_LIBRARIES})
+target_link_libraries(test-protein ${GSL_LIBRARIES})
 
 enable_testing()
+add_test(bitset test-bitset)
 add_test(metropolis test-metropolis)
-add_test(molecule test-molecule)
+add_test(protein test-protein)
+# add_test(geometry test-geometry)
