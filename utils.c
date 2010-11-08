@@ -1,0 +1,67 @@
+/**
+ * @file utils.c
+ */
+
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+
+#include <gsl/gsl_vector.h>
+#include <gsl/gsl_matrix.h>
+#include <gsl/gsl_blas.h>
+
+#include "utils.h"
+
+
+void cross_product(const gsl_vector *u,
+                   const gsl_vector *v,
+                   gsl_vector *product)
+{
+        double p1 = gsl_vector_get(u, 1)*gsl_vector_get(v, 2)
+                - gsl_vector_get(u, 2)*gsl_vector_get(v, 1);
+
+        double p2 = gsl_vector_get(u, 2)*gsl_vector_get(v, 0)
+                - gsl_vector_get(u, 0)*gsl_vector_get(v, 2);
+
+        double p3 = gsl_vector_get(u, 0)*gsl_vector_get(v, 1)
+                - gsl_vector_get(u, 1)*gsl_vector_get(v, 0);
+
+        gsl_vector_set(product, 0, p1);
+        gsl_vector_set(product, 1, p2);
+        gsl_vector_set(product, 2, p3);
+}
+
+double triple_scalar_product(const gsl_vector *u,
+                             const gsl_vector *v,
+                             const gsl_vector *w)
+{
+        double result;
+        double tmp[] = {0.0, 0.0, 0.0};
+        gsl_vector_view vxw = gsl_vector_view_array((double *) &tmp, 3);
+
+        cross_product(v, w, &vxw.vector);
+        gsl_blas_ddot(u, &vxw.vector, &result);
+
+        return result;
+}
+
+int print_matrix(FILE *stream, const gsl_matrix *matrix)
+{
+        int status, n = 0;
+
+        for (size_t i = 0; i < matrix->size1; i++) {
+                for (size_t j = 0; j < matrix->size2; j++) {
+                        status = fprintf(stream, "%g ",
+                                         gsl_matrix_get(matrix, i, j));
+                        if (status < 0)
+                                return -1;
+                        n += status;
+                }
+
+                if ((status = fprintf(stream, "\n")) < 0)
+                        return -1;
+                n += status;
+        }
+
+        return n;
+}

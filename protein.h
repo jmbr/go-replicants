@@ -1,28 +1,41 @@
-#ifndef MOLECULE_H
-#define MOLECULE_H
+#ifndef PROTEIN_H
+#define PROTEIN_H
 /**
- * @file molecule.h
- * @brief Interface for molecule manipulation features.
+ * @file protein.h
+ * @brief Interface for protein manipulation features.
  */
 
 #include <stddef.h>
 
+#include <gsl/gsl_vector.h>
+#include <gsl/gsl_matrix.h>
 
-typedef double real;
 
-typedef real vector[3];
-
-struct molecule {
-        size_t num_atoms;  // Number of alpha carbons.
-        vector *positions; // Position of each atom in $\mathbb{R}^3$.
+/**
+ * Protein structure intended for coarse-grained models.
+ */
+struct protein {
+        size_t num_atoms;
+        gsl_matrix *positions;
+        gsl_matrix *native_contacts;
 };
 
 
-extern struct molecule *new_molecule(size_t num_atoms, const vector *positions);
+extern struct protein *new_protein(size_t num_atoms, const double *positions);
+extern struct protein *new_protein_1pgb(void);
+extern struct protein *new_protein_2gb1(void);
 
-extern struct molecule *new_molecule_1pgb(void);
+extern void delete_protein(struct protein *self);
 
-extern struct molecule *new_molecule_2gb1(void);
+extern size_t protein_num_atoms(const struct protein *self);
 
-extern void delete_molecule(struct molecule *self);
-#endif // !MOLECULE_H
+extern gsl_vector_view protein_get_atom(const struct protein *self, size_t index);
+
+extern double protein_distance(const struct protein *self, size_t i, size_t j);
+
+extern void protein_compute_contact_map(struct protein *self, double d_max, gsl_matrix *contact_map);
+
+extern void protein_plot(const struct protein *self);
+
+/* extern int protein_plot_contact_map(const struct protein *self); */
+#endif // !PROTEIN_H
