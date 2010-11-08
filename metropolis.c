@@ -11,10 +11,22 @@
 #include "metropolis.h"
 
 
+/**
+ * Metropolis structure.  Provides context for the Metropolis-Hastings
+ * algorithm.
+ */
 struct metropolis {
+        /** Random number generator. */
         gsl_rng *rng;
+
+        /** Pointer to a function that generates new states. */
         metropolis_generator generator;
+
+        /** Pointer to a function proportional to the p.d.f. of the
+         * target distribution. */
         metropolis_pi pi;
+
+        /** Number of accepted moves and number of total moves. */
         uint_fast32_t accepted, total;
 };
 
