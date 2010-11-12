@@ -51,7 +51,7 @@ int print_matrix(FILE *stream, const gsl_matrix *matrix)
 
         for (size_t i = 0; i < matrix->size1; i++) {
                 for (size_t j = 0; j < matrix->size2; j++) {
-                        status = fprintf(stream, "%g ",
+                        status = fprintf(stream, "%e ",
                                          gsl_matrix_get(matrix, i, j));
                         if (status < 0)
                                 return -1;
@@ -62,6 +62,23 @@ int print_matrix(FILE *stream, const gsl_matrix *matrix)
                         return -1;
                 n += status;
         }
+
+        return n;
+}
+
+int print_vector(FILE *stream, const gsl_vector *vector)
+{
+        int status, n = 0;
+
+        for (size_t i = 0; i < vector->size; i++) {
+                status = fprintf(stream, "%e ", gsl_vector_get(vector, i));
+                if (status < 0)
+                        return -1;
+                n += status;
+        }
+        if ((status = fprintf(stream, "\n")) < 0)
+                return -1;
+        n += status;
 
         return n;
 }
