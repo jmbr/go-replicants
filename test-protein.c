@@ -62,16 +62,6 @@ void test_constructor_and_destructor(void)
         struct protein *g = new_protein_2gb1();
         assert(g != NULL);
 
-        /* XXX Reenable this: */
-        /* double p_1pgb = protein_potential(m, 0.9); */
-        /* double p_2gb1 = protein_potential(g, 0.9); */
-
-        /* assert(gsl_fcmp(p_1pgb, -460.0, 1e-15) == 0); */
-        /* assert(gsl_fcmp(p_2gb1, -460.0, 1e-15) == 0); */
-
-        /* printf("U(1pgb) = %g\n", p_1pgb); */
-        /* printf("U(2gb1) = %g\n", p_2gb1); */
-
         /* protein_plot(m); */
         /* protein_plot(g); */
 
