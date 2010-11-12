@@ -22,10 +22,13 @@ link_directories(${GSL_LINK_DIRECTORIES})
 
 add_executable(test-metropolis test-metropolis.c metropolis.c metropolis.h)
 add_executable(test-protein test-protein.c protein.c protein.h utils.c utils.h)
+add_executable(test-contact-map test-contact-map.c contact-map.c contact-map.h protein.c protein.h utils.c utils.h)
 
 target_link_libraries(test-metropolis ${GSL_LIBRARIES})
 target_link_libraries(test-protein ${GSL_LIBRARIES})
+target_link_libraries(test-contact-map ${GSL_LIBRARIES})
 
 enable_testing()
 add_test(metropolis test-metropolis)
 add_test(protein test-protein)
+add_test(contact-map test-contact-map)
