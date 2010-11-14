@@ -6,19 +6,18 @@
 
 #include <gsl/gsl_vector.h>
 #include <gsl/gsl_matrix.h>
-#include <gsl/gsl_blas.h>
 
 
-extern void cross_product(const gsl_vector *u, const gsl_vector *v, gsl_vector *result);
+#define declare_stack_allocated_vector(name, n)                         \
+        double stack_allocated_vector_array_##name[n];                  \
+        gsl_vector_view stack_allocated_vector_view_##name =		\
+                gsl_vector_view_array((double *) stack_allocated_vector_array_##name, n); \
+        gsl_vector *name = &stack_allocated_vector_view_##name.vector
 
-extern double triple_scalar_product(const gsl_vector *u, const gsl_vector *v, const gsl_vector *w);
+#define declare_stack_allocated_matrix(name, m, n)                      \
+        double stack_allocated_matrix_array_##name[n];                  \
+        gsl_matrix_view stack_allocated_matrix_view_##name =		\
+                gsl_matrix_view_array((double *) stack_allocated_matrix_array_##name, m, n); \
+        gsl_matrix *name = &stack_allocated_matrix_view_##name.matrix
 
-extern int print_matrix(FILE *stream, const gsl_matrix *matrix);
-
-extern int print_vector(FILE *stream, const gsl_vector *vector);
-
-static inline void vector_normalize(gsl_vector *v)
-{
-        gsl_vector_scale(v, 1.0/gsl_blas_dnrm2(v));
-}
 #endif // !UTILS_H
