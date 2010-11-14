@@ -20,20 +20,16 @@ struct contact_map {
         double *distance;
 };
 
-static const char gnuplot_command_line[] = GNUPLOT_EXECUTABLE " --persist";
-
 
 static void contact_map_compute(struct contact_map *self, const struct protein *protein);
-
+static int print_contact_map(FILE *stream, const struct contact_map *self);
 static inline size_t idx(size_t N, size_t i, size_t j)
 {
-        if (i == 0)
+        if (i == 0) /* XXX Is this the most compact expression possible? */
                 return j - i - 1;
         else
                 return j - i - 1 + i*(N-1) - (i-1)*i/2;
 }
-
-static int print_contact_map(FILE *stream, const struct contact_map *self);
 
 
         
@@ -84,7 +80,6 @@ void contact_map_compute(struct contact_map *self, const struct protein *protein
                         if (fabs(d) <= self->d_max) {
                                 self->distance[idx(N, i, j)] = d;
                                 ++self->num_contacts;
-                                printf("native contact #%04u: %02u, %02u\n", self->num_contacts, i, j);
                         } else {
                                 self->distance[idx(N, i, j)] = GSL_POSINF;
                         }
@@ -126,34 +121,32 @@ double contact_map_get_distance(const struct contact_map *self, size_t i, size_t
 
 
 
-int contact_map_plot(const struct contact_map *self)
+int contact_map_plot(const struct contact_map *self, FILE *gnuplot)
 {
         assert(self != NULL);
 
-        FILE *g = popen(gnuplot_command_line, "w");
-
-        if (g == NULL)
+        if (gnuplot == NULL)
                 return -1;
 
-        int status;
-
-        status = fprintf(g, "set title 'Contact map ($d_max$ = %2.3g)'\n"
-                            "set palette gray\n"
-                            "unset colorbox\n"
-                            "plot '-' matrix title '' with image\n",
-                         self->d_max);
+        int status = fprintf(gnuplot,
+                             "set title 'Contact map ($d_max$ = %2.3g)'\n"
+                             "set palette gray\n"
+                             "unset colorbox\n"
+                             "plot '-' matrix title '' with image\n",
+                             self->d_max);
         if (status < 0)
-                goto exit_cleanly;
+                return -1;
 
-        if ((status = print_contact_map(g, self)) < 0)
-                goto exit_cleanly;
+        if ((status = print_contact_map(gnuplot, self)) < 0)
+                return -1;
 
-        if (fprintf(g, "e\ne\n") < 0)
-                status = -1;
+        if (fprintf(gnuplot, "e\ne\n") < 0)
+                return -1;
 
-exit_cleanly:
-        pclose(g);
-        return status;
+        if (fflush(gnuplot) != 0)
+                return -1;
+
+        return 0;
 }
 
 int print_contact_map(FILE *stream, const struct contact_map *self)
@@ -164,13 +157,12 @@ int print_contact_map(FILE *stream, const struct contact_map *self)
         for (size_t i = 0; i < N; i++) {
                 for (size_t j = 0; j < N; j++) {
                         double d = contact_map_get_distance(self, i, j);
-                        status = fprintf(stream, "%c ", d <= self->d_max ? '0' : '1');
+                        status = fputs(d <= self->d_max ? "0 " : "1 ", stream);
                         if (status < 0)
                                 return -1;
                         n += status;
                 }
 
-                /* fprintf(stdout, "\n"); */
                 if (fprintf(stream, "\n") < 0)
                         return -1;
                 ++n;
