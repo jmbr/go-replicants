@@ -4,50 +4,26 @@
  */
 
 #include <stdlib.h>
-#include <stdint.h>
 #include <assert.h>
 #include <gsl/gsl_rng.h>
 
 #include "metropolis.h"
 
 
-/**
- * Metropolis structure.  Provides context for the Metropolis-Hastings
- * algorithm.
- */
-struct metropolis {
-        /** Random number generator. */
-        gsl_rng *rng;
-
-        /** Pointer to a function that generates new states. */
-        metropolis_generator generator;
-
-        /** Pointer to a function proportional to the p.d.f. of the
-         * target distribution. */
-        metropolis_pi pi;
-
-        /** Number of accepted moves and number of total moves. */
-        uint_fast32_t accepted, total;
-};
-
-
-struct metropolis *new_metropolis(unsigned int seed,
+struct metropolis *new_metropolis(gsl_rng *rng,
                                   metropolis_generator generator,
-                                  metropolis_pi pi)
+                                  metropolis_pdf_factor pdf_factor)
 {
-        struct metropolis *m;
-
-        if ((m = malloc(sizeof(struct metropolis))) == NULL)
+        if (rng == NULL)
                 return NULL;
 
-        if ((m->rng = gsl_rng_alloc(gsl_rng_mt19937)) == NULL) {
-                free(m);
+        struct metropolis *m = calloc(1, sizeof(struct metropolis));
+        if (m == NULL)
                 return NULL;
-        }
 
-        gsl_rng_set(m->rng, seed);
+        m->rng = rng;
         m->generator = generator;
-        m->pi = pi;
+        m->pdf_factor = pdf_factor;
         m->accepted = 0;
         m->total = 0;
 
@@ -57,40 +33,32 @@ struct metropolis *new_metropolis(unsigned int seed,
 void delete_metropolis(struct metropolis *self)
 {
         assert(self);
-        assert(self->rng);
 
-        gsl_rng_free(self->rng);
         free(self);
 }
 
-double metropolis_random(const struct metropolis *self)
+metropolis_state metropolis_iteration(struct metropolis *self,
+                                      metropolis_state current_state)
 {
-        assert(self);
-        assert(self->rng);
-
-        return gsl_rng_uniform(self->rng);
-}
-
-metropolis_state metropolis_iteration(struct metropolis *self, metropolis_state current_state)
-{
-        assert(self);
-
-        metropolis_state candidate = self->generator(current_state);
+        assert(self != NULL);
 
         ++self->total;
 
-        if (metropolis_random(self) < self->pi(candidate)/self->pi(current_state)) {
-                ++self->accepted;
-                return candidate;
-        } else {
-                return current_state;
-        }
-}
+        metropolis_state candidate_state = self->generator(self->rng,
+                                                           current_state);
+        const double p_current = self->pdf_factor(current_state);
+        const double p_candidate = self->pdf_factor(candidate_state);
 
+        if (gsl_rng_uniform(self->rng) < p_candidate/p_current) {
+                ++self->accepted;
+                return candidate_state;
+        } else
+                return current_state;
+}
 
 double metropolis_get_acceptance_ratio(const struct metropolis *self)
 {
         assert(self != NULL);
 
-        return ((double) self->accepted)/((double) self->total);
+        return (double) self->accepted/(double) self->total;
 }
