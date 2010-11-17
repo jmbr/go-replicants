@@ -66,7 +66,8 @@ void delete_contact_map(struct contact_map *self)
         free(self);
 }
 
-void contact_map_compute(struct contact_map *self, const struct protein *protein)
+void contact_map_compute(struct contact_map *self,
+                         const struct protein *protein)
 {
         assert(self != NULL);
         assert(protein != NULL);
@@ -103,7 +104,8 @@ double contact_map_get_d_max(const struct contact_map *self)
         return self->d_max;
 }
 
-double contact_map_get_distance(const struct contact_map *self, size_t i, size_t j)
+double contact_map_get_distance(const struct contact_map *self, 
+                                size_t i, size_t j)
 {
         assert(self != NULL);
         assert(self->num_atoms > 0);
@@ -117,7 +119,6 @@ double contact_map_get_distance(const struct contact_map *self, size_t i, size_t
         else
                 return self->distance[idx(self->num_atoms, j, i)];
 }
-
 
 
 

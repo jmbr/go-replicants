@@ -20,14 +20,17 @@ static inline double pairwise_potential(const struct protein *self,
                                         double a, double dnat);
 
 
-double potential(const struct protein *p, const struct contact_map *native_map, double a)
+double potential(const struct protein *p,
+                 const struct contact_map *native_map,
+                 double a)
 {
         assert(p != NULL);
         assert(a > 0.0);
 
         double U = 0.0;
         
-        /* XXX It is not necessary to check all contacts in each iteration (just those that are finite). */
+        /* XXX It is not necessary to check all contacts in each
+         * iteration (just those that are finite). */
 
         for (size_t i = 0; i < p->num_atoms; i++) {
                 for (size_t j = i; j < p->num_atoms; j++) {
