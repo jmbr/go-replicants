@@ -168,7 +168,8 @@ void test_movements(void)
 void test_simulation(void)
 {
         const size_t N = 1000;
-        struct simulation *s = new_simulation(SIMULATION_1PGB, 10, 0.75);
+        struct simulation *s = new_simulation(new_protein_1pgb(), 10, 0.75);
+        assert(s != NULL);
 
         for (size_t i = 0; i < N; i++) {
                 protein_do_movements(s->protein, s->rng);
@@ -181,5 +182,6 @@ void test_simulation(void)
 
         printf("Done.\n");
 
+        delete_protein(s->protein);
         delete_simulation(s);
 }
