@@ -5,6 +5,7 @@
  */
 
 #include <stdio.h>
+#include <stdint.h>
 
 #include <gsl/gsl_rng.h>
 #include <gsl/gsl_matrix.h>
@@ -22,6 +23,9 @@ struct simulation {
         /** Molecule being simulated. */
         struct protein *protein;
 
+        /** Potential energy. */
+        double U;
+
         /** Maximum distance between native contacts. */
         double d_max;
 
@@ -36,22 +40,22 @@ struct simulation {
          * be less than 1 Angstrom. */
         double a;
 
+        /** Number of accepted moves and number of total moves. */
+        uint_fast32_t accepted, total;
+
         /** Instance of Gnuplot. */
         FILE *gnuplot;
 
-        /* /\** Log file. *\/ */
-        /* FILE *log; */
+        /** Files containing the results. */
+        FILE *configurations, *energies;
 };
 
-enum simulation_protein {
-        SIMULATION_1PGB,
-        SIMULATION_2GB1
-};
 
-extern struct simulation *new_simulation(enum simulation_protein p,
+extern struct simulation *new_simulation(struct protein *p,
                                          double d_max, double a);
-
 extern void delete_simulation(struct simulation *self);
 
-/* extern double simulation_compute_potential(const simulation *self); */
+extern void simulation_do_iteration(struct simulation *self);
+
+extern double simulation_get_acceptance_ratio(const struct simulation *self);
 #endif // !SIMULATION_H
