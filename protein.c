@@ -58,6 +58,26 @@ void delete_protein(struct protein *self)
         free(self);
 }
 
+struct protein *protein_dup(const struct protein *self)
+{
+        if (self == NULL)
+                return NULL;
+
+        struct protein *p = malloc(sizeof(struct protein)
+                                   + self->num_atoms*sizeof(gsl_vector *));
+
+        /* XXX This can be sped up by allocating a large gsl_block
+         * beforehand.
+         */
+        p->num_atoms = self->num_atoms;
+        for (size_t i = 0; i < p->num_atoms; i++) {
+                p->atom[i] = gsl_vector_alloc(3);
+                gsl_vector_memcpy(p->atom[i], self->atom[i]);
+        }
+
+        return p;
+}
+
 
 
 static double signum(const struct protein *self, size_t i, size_t j)
