@@ -128,13 +128,15 @@ double protein_distance(const struct protein *self,
 
 
 
-void protein_plot(const struct protein *self, FILE *gnuplot, const char *title_format, ...)
+void protein_plot(const struct protein *self, FILE *gnuplot,
+                  const char *title_format, ...)
 {
         assert(self != NULL);
         assert(gnuplot != NULL);
 
-        va_list ap;
+        fprintf(gnuplot, "set terminal wxt noraise\n");
 
+        va_list ap;
         fprintf(gnuplot, "set title '");
         va_start(ap, title_format);
         vfprintf(gnuplot, title_format, ap);
