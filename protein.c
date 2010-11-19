@@ -196,14 +196,24 @@ bool protein_is_overlapping(const struct protein *self)
 
 void protein_do_movements(struct protein *self, gsl_rng *rng)
 {
-        /* TODO: Prove that no redundant movements are being done. */
+        static size_t k = 0;
+
+        k = (k+1) % (self->num_atoms-2);
+
         protein_do_end_move_first(self, rng);
-        protein_do_spike_move(self, rng, 0);
-        for (size_t i = 1; i < self->num_atoms - 2; i++) {
-                protein_do_spike_move(self, rng, i);
-                protein_do_shift_move(self, rng, i);
-                protein_do_pivot_move(self, rng, i);
-        }
+
+        /* TODO: Prove that no redundant movements are being done. */
+        if (gsl_rng_uniform_int(rng, 2) == 0)
+                protein_do_spike_move(self, rng, k);
+        else
+                protein_do_shift_move(self, rng, k);
+
+        /* protein_do_spike_move(self, rng, 0); */
+        /* for (size_t i = 1; i < self->num_atoms - 2; i++) { */
+        /*         protein_do_spike_move(self, rng, i); */
+        /*         protein_do_shift_move(self, rng, i); */
+        /*         protein_do_pivot_move(self, rng, i); */
+        /* } */
         protein_do_end_move_last(self, rng);
 }
 
