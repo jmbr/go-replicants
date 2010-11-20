@@ -10,6 +10,7 @@
 #include <math.h>
 #include <time.h>
 #include <getopt.h>
+#include <unistd.h>
 #undef NDEBUG
 #include <assert.h>
 
@@ -29,7 +30,6 @@ static bool plot_results = false;
 static void test_initialization_and_finalization(void);
 static void test_triple_scalar_product(void);
 static void test_movements(void);
-static void test_simulation(void);
 
 
 int main(int argc, char __attribute__((unused)) *argv[])
@@ -50,7 +50,6 @@ int main(int argc, char __attribute__((unused)) *argv[])
         test_initialization_and_finalization();
         test_triple_scalar_product();
         test_movements();
-        test_simulation();
 
         exit(EXIT_SUCCESS);
 }
@@ -130,58 +129,74 @@ void test_triple_scalar_product(void)
 
 void test_movements(void)
 {
-        const double atoms[][3] = {{-3.8, 0, 0},
-                                   {0, 0, 1},
-                                   {3.8, 0, 0},
-                                   {2.0*3.8, 0, 0},
-                                   {3.0*3.8, 0, 0},
-                                   {4.0*3.8, 0, 0},
-                                   {5.0*3.8, 0, 0}};
-        const size_t num_atoms = 7;
-        struct protein *n = new_protein(num_atoms, (const double *) atoms);
+        if (!plot_results)
+                return;
+
+        /* const double atoms[][3] = {{-3.8, 0, 0}, */
+        /*                            {0, 0, 1}, */
+        /*                            {3.8, 0, 0}, */
+        /*                            {2.0*3.8, 0, 0}, */
+        /*                            {3.0*3.8, 0, 0}, */
+        /*                            {4.0*3.8, 0, 0}, */
+        /*                            {5.0*3.8, 0, 0}}; */
+        /* const size_t num_atoms = 7; */
+
+        bool undo = true;
+        struct protein *n;
+        struct protein *(*constructor)(void) = new_protein_1pgb;
+
+        FILE *g = popen("gnuplot -persist", "w");
+        assert(g != NULL);
 
         gsl_rng *r = gsl_rng_alloc(gsl_rng_default);
         gsl_rng_env_setup();
-        gsl_rng_set(r, gsl_rng_default_seed);
+        gsl_rng_set(r, (unsigned) time(NULL));
 
-        FILE *g;
-
-        if (plot_results) {
-                g = popen("gnuplot -persist", "w");
-                assert(g != NULL);
+        n = constructor();
+        for (size_t i = 0; i < 100; i++) {
+                protein_plot(n, g, "End chain movement (1)");
+                protein_do_movement(n, r, PROTEIN_END_MOVE_FIRST, 0, undo);
         }
+        delete_protein(n);
+        sleep(3);
 
-        for (int i = 0; i < 1000; i++) {
-                protein_do_movements(n, r);
-
-                if (plot_results)
-                        protein_plot(n, g, "Spike move");
+        n = constructor();
+        for (size_t i = 0; i < 100; i++) {
+                protein_do_movement(n, r, PROTEIN_END_MOVE_LAST, 0, undo);
+                protein_plot(n, g, "End chain movement (2)");
         }
+        delete_protein(n);
+        sleep(3);
 
-        if (plot_results)
-                pclose(g);
+        n = constructor();
+        for (size_t i = 0; i < 250; i++) {
+                protein_do_movement(n, r, PROTEIN_SHIFT_MOVE, 1, undo);
+                protein_plot(n, g, "Shifting movement");
+        }
+        delete_protein(n);
+        sleep(3);
+
+        n = constructor();
+        for (size_t i = 0; i < 250; i++) {
+                protein_do_movement(n, r, PROTEIN_SPIKE_MOVE, 1, undo);
+                protein_plot(n, g, "Spike movement");
+        }
+        delete_protein(n);
+        sleep(3);
+
+        n = constructor();
+        for (size_t i = 0; i < 250; i++) {
+                protein_do_movement(n, r, PROTEIN_PIVOT_MOVE, 52, undo);
+                protein_plot(n, g, "Pivoting movement");
+        }
+        delete_protein(n);
+
+        n = constructor();
+        protein_scramble(n, r);
+        protein_plot(n, g, "Scrambled molecule");
+        delete_protein(n);
+
+        pclose(g);
 
         gsl_rng_free(r);
-        delete_protein(n);
-}
-
-void test_simulation(void)
-{
-        const size_t N = 1000;
-        struct simulation *s = new_simulation(new_protein_1pgb(), 10, 0.75);
-        assert(s != NULL);
-
-        for (size_t i = 0; i < N; i++) {
-                protein_do_movements(s->protein, s->rng);
-
-                double p = potential(s->protein, s->native_map, s->a);
-
-                if (plot_results)
-                        protein_plot(s->protein, s->gnuplot, "1PGB (%3.3g)", p);
-        }
-
-        printf("Done.\n");
-
-        delete_protein(s->protein);
-        delete_simulation(s);
 }

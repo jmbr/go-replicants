@@ -23,6 +23,17 @@
 
 
 
+static void protein_do_shift_move(struct protein *self, gsl_rng *rng, size_t k,
+                                  bool undo);
+static void protein_do_spike_move(struct protein *self, gsl_rng *rng, size_t k,
+                                  bool undo);
+static void protein_do_pivot_move(struct protein *self, gsl_rng *rng, size_t k,
+                                  bool undo);
+static void protein_do_end_move_first(struct protein *self, gsl_rng *rng, bool undo);
+static void protein_do_end_move_last(struct protein *self, gsl_rng *rng, bool undo);
+
+
+
 struct protein *new_protein(size_t num_atoms, const double *atom)
 {
         struct protein *m;
@@ -65,6 +76,8 @@ struct protein *protein_dup(const struct protein *self)
 
         struct protein *p = malloc(sizeof(struct protein)
                                    + self->num_atoms*sizeof(gsl_vector *));
+
+        assert(p != NULL);
 
         /* XXX This can be sped up by allocating a large gsl_block
          * beforehand.
@@ -134,7 +147,7 @@ void protein_plot(const struct protein *self, FILE *gnuplot,
         assert(self != NULL);
         assert(gnuplot != NULL);
 
-        fprintf(gnuplot, "set terminal wxt noraise\n");
+        fprintf(gnuplot, "set terminal wxt 0 noraise\n");
 
         va_list ap;
         fprintf(gnuplot, "set title '");
@@ -194,95 +207,98 @@ bool protein_is_overlapping(const struct protein *self)
 
 
 
-void protein_do_movements(struct protein *self, gsl_rng *rng)
+void protein_do_movement(struct protein *self, gsl_rng *rng,
+                         enum protein_movements m, size_t k, bool undo)
+{
+        assert(self != NULL);
+        assert(rng != NULL);
+
+        switch (m) {
+        case PROTEIN_SPIKE_MOVE:
+                protein_do_spike_move(self, rng, k, undo);
+                break;
+        case PROTEIN_SHIFT_MOVE:
+                protein_do_shift_move(self, rng, k, undo);
+                break;
+        case PROTEIN_PIVOT_MOVE:
+                protein_do_pivot_move(self, rng, k, undo);
+                break;
+        case PROTEIN_END_MOVE_FIRST:
+                protein_do_end_move_first(self, rng, undo);
+                break;
+        case PROTEIN_END_MOVE_LAST:
+                protein_do_end_move_last(self, rng, undo);
+                break;
+        }
+}
+
+void protein_do_natural_movement(struct protein *self, gsl_rng *rng)
 {
         static size_t k = 0;
 
-        k = (k+1) % (self->num_atoms-2);
+        ++k;
+        if (k >= self->num_atoms-2) /* XXX Fugly. */
+                k = 1;
 
-        protein_do_end_move_first(self, rng);
-
-        /* TODO: Prove that no redundant movements are being done. */
-        if (gsl_rng_uniform_int(rng, 2) == 0)
-                protein_do_spike_move(self, rng, k);
-        else
-                protein_do_shift_move(self, rng, k);
-
-        /* protein_do_spike_move(self, rng, 0); */
-        /* for (size_t i = 1; i < self->num_atoms - 2; i++) { */
-        /*         protein_do_spike_move(self, rng, i); */
-        /*         protein_do_shift_move(self, rng, i); */
-        /*         protein_do_pivot_move(self, rng, i); */
-        /* } */
-        protein_do_end_move_last(self, rng);
+        protein_do_end_move_first(self, rng, true);
+        protein_do_movement(self, rng, (enum protein_movements) gsl_rng_uniform_int(rng, 3), k, true);
+        protein_do_end_move_last(self, rng, true);
 }
 
 
 
-void protein_do_end_move_first(struct protein *self, gsl_rng *rng)
+void protein_do_end_move_first(struct protein *self, gsl_rng *rng, bool undo)
 {
-        assert(self != NULL);
-        assert(self->num_atoms >= 2);
-        assert(rng != NULL);
-
         dprintf("moving first atom.\n");
-        dprintf("before: atom(0) == "); print_vector(stderr, self->atom[0]);
+        dprintf("before: atom(0) == "); dprint_vector(self->atom[0]);
 
         double R[3][3];
         make_random_rotation_matrix(R, rng);
         gsl_matrix_view RV = gsl_matrix_view_array((double *) R, 3, 3);
         rotate(false, &RV.matrix, self->atom[1], self->atom[0]);
-        dprintf("after: atom(0) == "); print_vector(stderr, self->atom[0]);
+        dprintf("after: atom(0) == "); dprint_vector(self->atom[0]);
 
-        if (protein_is_overlapping(self)) {
-                /* Let's undo the movement. */
+        if (undo && protein_is_overlapping(self)) {
                 rotate(true, &RV.matrix, self->atom[1], self->atom[0]);
-                dprintf("after undo: atom(0) == "); print_vector(stderr, self->atom[0]);
+                dprintf("after undo: atom(0) == "); dprint_vector(self->atom[0]);
         }
 }
 
-void protein_do_end_move_last(struct protein *self, gsl_rng *rng)
+void protein_do_end_move_last(struct protein *self, gsl_rng *rng, bool undo)
 {
-        assert(self != NULL);
-        assert(self->num_atoms >= 2);
-        assert(rng != NULL);
-
-        const size_t num_atoms = self->num_atoms;
-
         dprintf("moving last atom.\n");
-        dprintf("before: atom(%d) == ", num_atoms-1); print_vector(stderr, self->atom[num_atoms - 1]);
+        dprintf("before: atom(%d) == ", self->num_atoms-1);
+        dprint_vector(self->atom[self->num_atoms - 1]);
 
         double R[3][3];
         make_random_rotation_matrix(R, rng);
         gsl_matrix_view RV = gsl_matrix_view_array((double *) R, 3, 3);
         rotate(false, &RV.matrix, self->atom[self->num_atoms - 2],
                            self->atom[self->num_atoms - 1]);
-        dprintf("after: atom(%d) == ", num_atoms-1); print_vector(stderr, self->atom[num_atoms - 1]);
 
-        if (protein_is_overlapping(self)) {
-                /* Let's undo the movement. */
+        dprintf("after: atom(%d) == ", self->num_atoms-1);
+        dprint_vector(self->atom[self->num_atoms - 1]);
+
+        if (undo && protein_is_overlapping(self)) {
                 rotate(true, &RV.matrix,
                        self->atom[self->num_atoms - 2],
                        self->atom[self->num_atoms - 1]);
-                dprintf("after undo: atom(%d) == ", num_atoms-1); print_vector(stderr, self->atom[num_atoms-1]);
+                dprintf("after undo: atom(%d) == ", self->num_atoms-1);
+                dprint_vector(self->atom[self->num_atoms-1]);
         }
 }
 
 
 
-void protein_do_shift_move(struct protein *self, gsl_rng *rng, size_t k)
+void protein_do_shift_move(struct protein *self, gsl_rng *rng, size_t k, bool undo)
 {
-        assert(self != NULL);
-        assert(self->num_atoms >= 3);
-        assert(rng != NULL);
-
         assert(k <= self->num_atoms - 3);
 
         /* const size_t k = gsl_rng_uniform_int(rng, self->num_atoms - 3); */
 
         dprintf("shifting move at atom %u\n", k);
-        dprintf("before: atom(%u) == ", self->num_atoms-1); print_vector(stderr, self->atom[self->num_atoms-1]);
-        dprintf("before: atom(%u) == ", k+1); print_vector(stderr, self->atom[k+1]);
+        dprintf("before: atom(%u) == ", self->num_atoms-1); dprint_vector(self->atom[self->num_atoms-1]);
+        dprintf("before: atom(%u) == ", k+1); dprint_vector(self->atom[k+1]);
 
         double R[3][3];
         make_random_rotation_matrix(R, rng);
@@ -306,20 +322,20 @@ void protein_do_shift_move(struct protein *self, gsl_rng *rng, size_t k)
         for (size_t i = k+2; i < self->num_atoms; i++)
                 gsl_vector_sub(self->atom[i], t);
 
-        dprintf("after: atom(%u) == ", self->num_atoms-1); print_vector(stderr, self->atom[self->num_atoms-1]);
-        dprintf("after: atom(%u) == ", k+1); print_vector(stderr, self->atom[k+1]);
+        dprintf("after: atom(%u) == ", self->num_atoms-1); dprint_vector(self->atom[self->num_atoms-1]);
+        dprintf("after: atom(%u) == ", k+1); dprint_vector(self->atom[k+1]);
 
-        if (protein_is_overlapping(self)) { /* Undo movement. */
+        if (undo && protein_is_overlapping(self)) {
                 dprintf("undoing shift movement.\n");
 
                 for (size_t i = k+2; i < self->num_atoms; i++)
                         gsl_vector_add(self->atom[i], t);
 
-                dprintf("after undo: atom(%u) == ", self->num_atoms-1); print_vector(stderr, self->atom[self->num_atoms-1]);
+                dprintf("after undo: atom(%u) == ", self->num_atoms-1); dprint_vector(self->atom[self->num_atoms-1]);
 
                 gsl_vector_memcpy(self->atom[k+1], bak);
 
-                dprintf("after undo: atom(%u) == ", k+1); print_vector(stderr, self->atom[k+1]);
+                dprintf("after undo: atom(%u) == ", k+1); dprint_vector(self->atom[k+1]);
         }
 
         gsl_vector_free(bak);
@@ -327,25 +343,27 @@ void protein_do_shift_move(struct protein *self, gsl_rng *rng, size_t k)
 
 
 
-static void do_spike_move(struct protein *self, size_t i, double theta)
+void protein_do_spike_move(struct protein *self, gsl_rng *rng, size_t k, bool undo)
 {
-        dprintf("performing spike move of %g radians on atom %u.\n", theta, i);
+        assert(k <= self->num_atoms - 3);
+
+        const double theta = 2*M_PI*gsl_rng_uniform_pos(rng);
 
         gsl_vector *bak = gsl_vector_alloc(3);
-        gsl_vector_memcpy(bak, self->atom[i+1]);
+        gsl_vector_memcpy(bak, self->atom[k+1]);
 
-        dprintf("before: atom(%u) == ", i+1); print_vector(stderr, self->atom[i+1]);
+        dprintf("before: atom(%u) == ", i+1); dprint_vector(self->atom[k+1]);
 
         /* v = p3-p1 */
         gsl_vector *v = gsl_vector_alloc(3);
-        gsl_vector_memcpy(v, self->atom[i+2]);
-        gsl_vector_sub(v, self->atom[i]);
+        gsl_vector_memcpy(v, self->atom[k+2]);
+        gsl_vector_sub(v, self->atom[k]);
         vector_normalize(v);
 
         /* a = p2-p1 */
         gsl_vector *a = gsl_vector_alloc(3);
-        gsl_vector_memcpy(a, self->atom[i+1]);
-        gsl_vector_sub(a, self->atom[i]);
+        gsl_vector_memcpy(a, self->atom[k+1]);
+        gsl_vector_sub(a, self->atom[k]);
 
         /* w = <a, v> v */
         gsl_vector *w = gsl_vector_alloc(3);
@@ -357,11 +375,11 @@ static void do_spike_move(struct protein *self, size_t i, double theta)
         /* t = p1 + w */
         gsl_vector *t = gsl_vector_alloc(3);
         gsl_vector_memcpy(t, w);
-        gsl_vector_add(t, self->atom[i]);
+        gsl_vector_add(t, self->atom[k]);
 
-        /* q = atom[i+1] - t */
+        /* q = atom[k+1] - t */
         gsl_vector *q = gsl_vector_alloc(3);
-        gsl_vector_memcpy(q, self->atom[i+1]);
+        gsl_vector_memcpy(q, self->atom[k+1]);
         gsl_vector_sub(q, t);
 
         gsl_matrix *G = gsl_matrix_alloc(3, 3);
@@ -376,17 +394,7 @@ static void do_spike_move(struct protein *self, size_t i, double theta)
         vector_normalize(&u2.vector);
 
         cross_product(&u0.vector, &u2.vector, &u1.vector);
-        if (gsl_fcmp(gsl_blas_dnrm2(&u1.vector), 1.0, GSL_DBL_EPSILON) != 0) {
-                dprintf("|u0 x u2| == "); print_vector(stderr, &u1.vector);
-                dprintf("ignoring collinear configuration:\n");
-                dprintf("atom(%u) == ", i);   print_vector(stderr, self->atom[i]);
-                dprintf("atom(%u) == ", i+1); print_vector(stderr, self->atom[i+1]);
-                dprintf("atom(%u) == ", i+2); print_vector(stderr, self->atom[i+2]);
-                fflush(stderr);
-
-                assert(0);
-                goto cleanup;
-        }
+        assert(gsl_fcmp(gsl_blas_dnrm2(&u1.vector), 0.0, 1e-3) != 0);
 
         double R[3][3] = {{cos(theta), -sin(theta), 0.0},
                           {sin(theta),  cos(theta), 0.0},
@@ -402,61 +410,31 @@ static void do_spike_move(struct protein *self, size_t i, double theta)
         gsl_blas_dgemv(CblasNoTrans, 1.0, B, q, 0.0, z);
 
         gsl_vector_add(z, t);
-        gsl_vector_memcpy(self->atom[i+1], z);
+        gsl_vector_memcpy(self->atom[k+1], z);
 
-        dprintf("after: atom(%d) == ", i+1); print_vector(stderr, self->atom[i+1]);
+        dprintf("after: atom(%d) == ", i+1); dprint_vector(self->atom[k+1]);
 
         /* We are done if the conformation is correct. */
-        if (protein_is_overlapping(self)) {
-                dprintf("undoing invalid conformation.\n");
-
-                gsl_vector_memcpy(self->atom[i+1], bak);
-
-                dprintf("after undo: atom(%d) == ", i+1); print_vector(stderr, self->atom[i+1]);
+        if (undo && protein_is_overlapping(self)) {
+                gsl_vector_memcpy(self->atom[k+1], bak);
+                dprintf("after undo: atom(%d) == ", i+1); dprint_vector(self->atom[k+1]);
         }
 
-cleanup:                        /* XXX This is a mess. */
         gsl_vector_free(bak);
-        gsl_vector_free(v);
-        gsl_vector_free(a);
-        gsl_vector_free(w);
-        gsl_vector_free(t);
-        gsl_vector_free(q);
-        gsl_vector_free(z);
-        gsl_matrix_free(G);
-        gsl_matrix_free(A);
-        gsl_matrix_free(B);
-}
-
-void protein_do_spike_move(struct protein *self, gsl_rng *rng, size_t k)
-{
-        assert(self != NULL);
-        assert(self->num_atoms >= 3);
-        assert(rng != NULL);
-
-        if (k > self->num_atoms - 3) {
-        }
-
-        const double theta = 2*M_PI*gsl_rng_uniform_pos(rng);
-        /* const size_t k = gsl_rng_uniform_int(rng, self->num_atoms - 3); */
-
-        do_spike_move(self, k, theta);
+        gsl_vector_free(v); gsl_vector_free(a); gsl_vector_free(w);
+        gsl_vector_free(t); gsl_vector_free(q); gsl_vector_free(z);
+        gsl_matrix_free(G); gsl_matrix_free(A); gsl_matrix_free(B);
 }
 
 
 
-void protein_do_pivot_move(struct protein *self, gsl_rng *rng, size_t k)
+void protein_do_pivot_move(struct protein *self, gsl_rng *rng, size_t k, bool undo)
 {
-        assert(self != NULL);
-        assert(rng != NULL);
-
-        /* const size_t k = gsl_rng_uniform_int(rng, self->num_atoms - 1); */
         const double theta = 2*M_PI*gsl_rng_uniform_pos(rng);
 
         dprintf("pivoting move at atom %u.\n", k);
-
         dprintf("before: atom(%d) == ", k+1);
-        print_vector(stderr, self->atom[k+1]);
+        dprint_vector(self->atom[k+1]);
 
         double RR[3][3] = {{cos(theta), -sin(theta), 0.0},
                            {sin(theta),  cos(theta), 0.0},
@@ -472,41 +450,36 @@ void protein_do_pivot_move(struct protein *self, gsl_rng *rng, size_t k)
         }
 
         dprintf("after: atom(%d) == ", k+1);
-        print_vector(stderr, self->atom[k+1]);
+        dprint_vector(self->atom[k+1]);
 
-        /* We are done if the conformation is correct. */
-        if (protein_is_not_overlapping(self))
-                return;
-
-        dprintf("undoing invalid conformation.\n");
-
-        /* Undo movement if an invalid conformation is reached. */
-        for (size_t i = k+1; i < self->num_atoms; i++) {
-                gsl_vector_memcpy(y, self->atom[k]);
-                gsl_vector_sub(self->atom[i], y);
-                gsl_blas_dgemv(CblasTrans, 1.0, &RV.matrix, self->atom[i],
-                               1.0, y);
-                gsl_vector_memcpy(self->atom[i], y);
+        if (undo && protein_is_overlapping(self)) {
+                dprintf("undoing invalid conformation.\n");
+                for (size_t i = k+1; i < self->num_atoms; i++) {
+                        gsl_vector_memcpy(y, self->atom[k]);
+                        gsl_vector_sub(self->atom[i], y);
+                        gsl_blas_dgemv(CblasTrans, 1.0,
+                                       &RV.matrix, self->atom[i],
+                                       1.0, y);
+                        gsl_vector_memcpy(self->atom[i], y);
+                }
+                dprintf("after undo: atom(%d) == ", k+1);
+                dprint_vector(self->atom[k+1]);
         }
-
-        dprintf("after undo: atom(%d) == ", k+1);
-        print_vector(stderr, self->atom[k+1]);
 }
 
 
 
 void protein_scramble(struct protein *self, gsl_rng *rng)
 {
-        /* XXX This could be improved by adding a convergence
-         * criterium. */
-        for (size_t r = 0; r < 500; r++) {
-                protein_do_end_move_first(self, rng);
-                protein_do_spike_move(self, rng, 0);
+        /* TODO: This could be improved by adding a convergence criterium. */
+        for (size_t r = 0; r < 150; r++) {
+                protein_do_end_move_first(self, rng, true);
+                protein_do_spike_move(self, rng, 0, true);
                 for (size_t i = 1; i < self->num_atoms - 2; i++) {
-                        protein_do_spike_move(self, rng, i);
-                        protein_do_shift_move(self, rng, i);
-                        protein_do_pivot_move(self, rng, i);
+                        protein_do_spike_move(self, rng, i, true);
+                        protein_do_shift_move(self, rng, i, true);
+                        protein_do_pivot_move(self, rng, i, true);
                 }
-                protein_do_end_move_last(self, rng);
+                protein_do_end_move_last(self, rng, true);
         }
 }
