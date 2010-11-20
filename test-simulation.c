@@ -7,10 +7,12 @@
 #include <stdbool.h>
 #include <math.h>
 #include <assert.h>
+#include <unistd.h>
 
 #include <gsl/gsl_math.h>
 #include <gsl/gsl_const.h>
 
+#include "geometry.h"
 #include "protein.h"
 #include "potential.h"
 #include "contact-map.h"
@@ -21,7 +23,8 @@
 static bool plot_results = false;
 
 
-static struct protein *new_truncated_1pgb(void);
+static struct protein *new_truncated_1pgb(size_t start, size_t end);
+
 static void test_simulation(void);
 
 
@@ -45,45 +48,62 @@ int main(int argc, char *argv[])
         exit(EXIT_SUCCESS);
 }
 
-void test_simulation(void)
+
+
+static void show_progress(struct simulation *s, size_t k)
 {
-        struct simulation *s = new_simulation(new_truncated_1pgb(), 10, 0.75);
+        if (k != 1 && k % 10000 != 0)
+                return;
+
+        if (plot_results)
+                protein_plot(s->protein, s->gnuplot,
+                             "#%u (%g).  Acceptance: %2.03g%%",
+                             k, s->energy, simulation_get_acceptance_ratio(s));
+        printf("Progress %1.3g%% (%g/%g)                    \r",
+               100*s->energy/s->orig_energy, s->energy, s->orig_energy);
+}
+
+static void simulate_fragment(size_t start, size_t end)
+{
+        struct simulation *s = new_simulation(new_truncated_1pgb(start, end), 10, 0.1);
         assert(s != NULL);
 
+        printf("Simulating fragment #%2u-%2u of 1PGB.\n", start, end);
+
+        printf("fragment = [\n");
+        for (size_t k = 0; k < s->protein->num_atoms; k++)
+                print_vector(stdout, s->protein->atom[k]);
+        printf("]\n");
+
         if (plot_results) {
-                protein_plot(s->protein, s->gnuplot,
-                             "Before: (part of) 1PGB (%3.3g)", s->U);
-                (void) getchar();
+                protein_plot(s->protein, s->gnuplot, "Original: (%3.3g)",
+                             s->energy);
                 /* contact_map_plot(s->native_map, s->gnuplot); */
-                /* (void) getchar(); */
+                sleep(3);
         }
 
-        protein_scramble(s->protein, s->rng);
-        if (plot_results) {
-                protein_plot(s->protein, s->gnuplot, "After: (part of) 1PGB (%3.3g)",
-                             potential(s->protein, s->native_map, s->a));
-                (void) getchar();
+        size_t k = 0;
+        for (simulation_first_iteration(s);
+             simulation_has_not_converged(s);
+             simulation_next_iteration(s), k++)
+        {
+                show_progress(s, k);
         }
 
-        /* Now we want to unscramble our protein as much as we
-         * possibly can. */
-        for (size_t k = 1; /*k < 500000*/; k++) {
-                simulation_do_iteration(s);
-                
-                if (k == 1 || k % 100 == 0) {
-                        if (plot_results)
-                                protein_plot(s->protein,
-                                             s->gnuplot,
-                                             "(part of) 1PGB #%u (%3.3g).  Acceptance: %02.03g%%",
-                                             k, s->U, simulation_get_acceptance_ratio(s));
-                }
-        }
+        printf("\nEnergy after simulation: %g\n", s->energy);
 
         delete_protein(s->protein);
         delete_simulation(s);
 }
 
-struct protein *new_truncated_1pgb(void)
+void test_simulation(void)
+{
+        simulate_fragment(0, 6);
+        simulate_fragment(6, 10);
+        /* simulate_fragment(0, 15); */
+}
+
+struct protein *new_truncated_1pgb(size_t start, size_t end)
 {
         const double positions[][3] = {
                 { 13.935, 18.529, 29.843 },
@@ -95,7 +115,6 @@ struct protein *new_truncated_1pgb(void)
                 { 8.009, 15.163, 11.389 },
                 { 8.628, 13.975, 7.913 },
                 { 5.213, 12.642, 6.966 },
-
                 { 3.589, 12.601, 3.497 },
                 { 1.291, 15.471, 4.538 },
                 { 2.624, 17.021, 7.787 },
@@ -148,22 +167,9 @@ struct protein *new_truncated_1pgb(void)
         };
         const size_t num_atoms = sizeof(positions)/sizeof(positions[0]);
 
-        return new_protein(num_atoms, (double *) positions);
+        if (start > end || end >= num_atoms)
+                return NULL;
+        else
+                return new_protein(end - start + 1,
+                                   (const double *) &positions[start]);
 }
-        
-
-        /* const size_t N = 500; */
-        /* for (size_t i = 0; i < N; i++) { */
-        /*         protein_do_movements(s->protein, s->rng); */
-
-        /*         double p = potential(s->protein, s->native_map, s->a); */
-
-        /*         if (plot_results) */
-        /*                 protein_plot(s->protein, s->gnuplot, "beta-sheet of 1PGB (%3.3g)", p); */
-        /* } */
-
-        /* printf("Done.\n"); */
-        /* struct contact_map *c = new_contact_map(s->protein, 7.5); */
-        /* if (plot_results) */
-        /*         contact_map_plot(c, s->gnuplot); */
-        /* delete_contact_map(c); */

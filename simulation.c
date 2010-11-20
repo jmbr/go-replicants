@@ -4,10 +4,12 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <math.h>
 #include <assert.h>
 
 #include <gsl/gsl_const.h>
+#include <gsl/gsl_math.h>
 #include <gsl/gsl_rng.h>
 
 #include "protein.h"
@@ -15,6 +17,8 @@
 #include "contact-map.h"
 #include "simulation.h"
 
+
+const size_t simulation_save_step = 10000;
 
 const char gnuplot_command_line[] = GNUPLOT_EXECUTABLE " -persist";
 
@@ -41,7 +45,7 @@ struct simulation *new_simulation(struct protein *p,
         s->a = a;
 
         /* Compute the potential energy for the protein. */
-        s->U = potential(s->protein, s->native_map, s->a);
+        s->orig_energy = s->energy = potential(s->protein, s->native_map, s->a);
 
         /* Initialize the pseudo-random number generator. */
         s->rng = gsl_rng_alloc(gsl_rng_default);
@@ -96,25 +100,41 @@ compute_potential_energy(const struct protein *x, const struct simulation *s)
         return potential(x, s->native_map, s->a);
 }
 
-static void simulation_save_state(struct simulation *self)
+static void simulation_save_state_when_appropriate(struct simulation *self)
 {
-        protein_print_atoms(self->protein, self->configurations);
-        fflush(self->configurations);
+        if (self->total % simulation_save_step == 0) {
+                protein_print_atoms(self->protein, self->configurations);
+                fflush(self->configurations);
 
-        fprintf(self->energies, "%e\n", self->U);
-        fflush(self->energies);
+                fprintf(self->energies, "%e\n", self->energy);
+                fflush(self->energies);
+        }
 }
 
-void simulation_do_iteration(struct simulation *self)
+void simulation_first_iteration(struct simulation *self)
 {
         assert(self != NULL);
 
         ++self->total;
 
+        protein_scramble(self->protein, self->rng);
+
+        self->energy = compute_potential_energy(self->protein, self);
+}
+
+void simulation_next_iteration(struct simulation *self)
+{
+        assert(self != NULL);
+
+        ++self->total;
+
+        simulation_save_state_when_appropriate(self);
+
         struct protein *candidate, *current = self->protein;
 
         candidate = protein_dup(current);
-        protein_do_movements(candidate, self->rng);
+        assert(candidate != NULL);
+        protein_do_natural_movement(candidate, self->rng);
 
         const double U1 = compute_potential_energy(current, self);
         const double U2 = compute_potential_energy(candidate, self);
@@ -125,7 +145,7 @@ void simulation_do_iteration(struct simulation *self)
         if (DU < 0.0)
                 chosen = candidate;
         else {
-                const double T = 25.5;   /* XXX Change the temperature. */
+                const double T = 1.0;   /* XXX Change the temperature. */
                 const double r = gsl_rng_uniform(self->rng);
                 const double p = exp(-1.0/(GSL_CONST_MKSA_BOLTZMANN*T)*DU);
 
@@ -136,9 +156,15 @@ void simulation_do_iteration(struct simulation *self)
                 ++self->accepted;
                 delete_protein(self->protein);
                 self->protein = candidate;
-                self->U = U2;
-                simulation_save_state(self);
+                self->energy = U2;
         } else {
                 delete_protein(candidate);
         }
+}
+
+bool simulation_has_converged(const struct simulation *self)
+{
+        assert(self != NULL);
+
+        return gsl_fcmp(self->orig_energy, self->energy, 1e-3) == 0;
 }
