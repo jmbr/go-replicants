@@ -471,15 +471,9 @@ void protein_do_pivot_move(struct protein *self, gsl_rng *rng, size_t k, bool un
 
 void protein_scramble(struct protein *self, gsl_rng *rng)
 {
-        /* TODO: This could be improved by adding a convergence criterium. */
-        for (size_t r = 0; r < 150; r++) {
-                protein_do_end_move_first(self, rng, true);
-                protein_do_spike_move(self, rng, 0, true);
-                for (size_t i = 1; i < self->num_atoms - 2; i++) {
-                        protein_do_spike_move(self, rng, i, true);
-                        protein_do_shift_move(self, rng, i, true);
-                        protein_do_pivot_move(self, rng, i, true);
-                }
-                protein_do_end_move_last(self, rng, true);
+        for (size_t r = 0; r < 10*self->num_atoms; r++)
+                protein_do_natural_movement(self, rng);
+}
+
         }
 }
