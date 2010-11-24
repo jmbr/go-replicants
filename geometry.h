@@ -26,6 +26,11 @@ extern void rotate(bool transpose, const gsl_matrix *R, const gsl_vector *a, gsl
 extern int print_matrix(FILE *stream, const gsl_matrix *matrix);
 
 extern int print_vector(FILE *stream, const gsl_vector *vector);
+#if DEBUG_LEVEL > 0
+# define dprint_vector(v) print_vector(stderr, v)
+#else
+# define dprint_vector(v)
+#endif // DEBUG_LEVEL > 0
 
 static inline void vector_normalize(gsl_vector *v)
 {

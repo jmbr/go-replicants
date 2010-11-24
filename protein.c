@@ -229,6 +229,9 @@ void protein_do_movement(struct protein *self, gsl_rng *rng,
         case PROTEIN_END_MOVE_LAST:
                 protein_do_end_move_last(self, rng, undo);
                 break;
+        default:
+                assert(0);
+                break;
         }
 }
 
@@ -352,7 +355,7 @@ void protein_do_spike_move(struct protein *self, gsl_rng *rng, size_t k, bool un
         gsl_vector *bak = gsl_vector_alloc(3);
         gsl_vector_memcpy(bak, self->atom[k+1]);
 
-        dprintf("before: atom(%u) == ", i+1); dprint_vector(self->atom[k+1]);
+        dprintf("before: atom(%u) == ", k+1); dprint_vector(self->atom[k+1]);
 
         /* v = p3-p1 */
         gsl_vector *v = gsl_vector_alloc(3);
@@ -412,12 +415,12 @@ void protein_do_spike_move(struct protein *self, gsl_rng *rng, size_t k, bool un
         gsl_vector_add(z, t);
         gsl_vector_memcpy(self->atom[k+1], z);
 
-        dprintf("after: atom(%d) == ", i+1); dprint_vector(self->atom[k+1]);
+        dprintf("after: atom(%d) == ", k+1); dprint_vector(self->atom[k+1]);
 
         /* We are done if the conformation is correct. */
         if (undo && protein_is_overlapping(self)) {
                 gsl_vector_memcpy(self->atom[k+1], bak);
-                dprintf("after undo: atom(%d) == ", i+1); dprint_vector(self->atom[k+1]);
+                dprintf("after undo: atom(%d) == ", k+1); dprint_vector(self->atom[k+1]);
         }
 
         gsl_vector_free(bak);
