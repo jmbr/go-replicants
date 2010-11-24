@@ -130,6 +130,7 @@ int contact_map_plot(const struct contact_map *self, FILE *gnuplot)
                 return -1;
 
         int status = fprintf(gnuplot,
+                             "set terminal wxt noraise\n"
                              "set title 'Contact map ($d_max$ = %2.3g)'\n"
                              "set palette gray\n"
                              "unset colorbox\n"
