@@ -175,7 +175,7 @@ int protein_print_atoms(const struct protein *self, FILE *stream)
         int status, n = 0;
 
         for (size_t i = 0; i < self->num_atoms; i++) {
-                status = fprintf(stream, "%e %e %e\n",
+                status = fprintf(stream, "%f %f %f\n",
                                  gsl_vector_get(self->atom[i], 0),
                                  gsl_vector_get(self->atom[i], 1),
                                  gsl_vector_get(self->atom[i], 2));
