@@ -30,6 +30,9 @@ struct simulation {
         /** Maximum distance between native contacts. */
         double d_max;
 
+        /** Temperature. */
+        double T;
+
         /** Tolerance for distances between amino acids.  This is used
          * for the potential energy calculation and its value should
          * be less than 1 Angstrom. */
@@ -51,8 +54,12 @@ struct simulation {
         FILE *configurations, *energies;
 };
 
-extern struct simulation *new_simulation(struct protein *p,
-                                         double d_max, double a);
+
+struct simulation_options {
+        double d_max, a, T;
+};
+
+extern struct simulation *new_simulation(struct protein *p, const struct simulation_options *opts);
 extern void delete_simulation(struct simulation *self);
 
 extern void simulation_first_iteration(struct simulation *self);
