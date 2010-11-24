@@ -475,5 +475,37 @@ void protein_scramble(struct protein *self, gsl_rng *rng)
                 protein_do_natural_movement(self, rng);
 }
 
+
+
+static int write_to_xyz_file(const struct protein *self, FILE *stream)
+{
+        int status, n = 0;
+
+        fprintf(stream, "%u\n", self->num_atoms);
+        fprintf(stream, "Protein\n");
+        for (size_t i = 0; i < self->num_atoms; i++) {
+                status = fprintf(stream, "CA %g %g %g\n",
+                                 gsl_vector_get(self->atom[i], 0),
+                                 gsl_vector_get(self->atom[i], 1),
+                                 gsl_vector_get(self->atom[i], 2));
+                if (status < 0)
+                        return -1;
+                n += status;
         }
+
+        return n;
+}
+
+int protein_write_to_xyz_file(const struct protein *self, const char *name)
+{
+        FILE *f;
+
+        if ((f = fopen(name, "w")) == NULL)
+                return -1;
+
+        int status = write_to_xyz_file(self, f);
+
+        fclose(f);
+
+        return status;
 }

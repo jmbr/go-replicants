@@ -54,4 +54,7 @@ extern void protein_do_movement(struct protein *self, gsl_rng *rng,
 extern void protein_do_natural_movement(struct protein *self, gsl_rng *rng);
 
 extern void protein_scramble(struct protein *self, gsl_rng *rng);
+
+extern int protein_write_to_xyz_file(const struct protein *self,
+                                     const char *name);
 #endif // !PROTEIN_H
