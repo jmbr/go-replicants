@@ -93,7 +93,7 @@ struct protein *protein_dup(const struct protein *self)
 
 
 
-static double signum(const struct protein *self, size_t i, size_t j)
+double protein_signum(const struct protein *self, size_t i, size_t j)
 {
         double s = 1.0;
 
@@ -136,7 +136,7 @@ double protein_distance(const struct protein *self,
         gsl_vector_memcpy(&v.vector, self->atom[j]);
         gsl_vector_sub(&v.vector, self->atom[i]);
 
-        return signum(self, i, j)*gsl_blas_dnrm2(&v.vector);
+        return gsl_blas_dnrm2(&v.vector);
 }
 
 

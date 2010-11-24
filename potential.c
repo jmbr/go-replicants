@@ -51,7 +51,7 @@ static inline double pairwise_potential(const struct protein *p,
                                         double a, double dnat)
 {
         const double a2 = gsl_pow_2(a);
-        const double r = protein_distance(p, i, j);
+        const double r = protein_signum(p, i, j)*protein_distance(p, i, j);
 
         return (fabs(r - dnat) < a) ? 1/a2*(gsl_pow_2(r - dnat) - a2) : 0;
 }

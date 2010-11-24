@@ -78,8 +78,8 @@ void contact_map_compute(struct contact_map *self,
                 for (size_t j = i+1; j < N; j++) {
                         double d = protein_distance(protein, i, j);
 
-                        if (fabs(d) <= self->d_max) {
-                                self->distance[idx(N, i, j)] = d;
+                        if (d <= self->d_max) {
+                                self->distance[idx(N, i, j)] = protein_signum(protein, i, j)*d;
                                 ++self->num_contacts;
                         } else {
                                 self->distance[idx(N, i, j)] = GSL_POSINF;

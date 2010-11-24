@@ -37,6 +37,7 @@ extern void delete_protein(struct protein *self);
 
 extern struct protein *protein_dup(const struct protein *self);
 
+extern double protein_signum(const struct protein *self, size_t i, size_t j);
 extern double protein_distance(const struct protein *self, size_t i, size_t j);
 
 extern void protein_plot(const struct protein *self, FILE *gnuplot,
