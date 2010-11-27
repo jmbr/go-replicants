@@ -1,18 +1,4 @@
-/**
- * @file potential.h
- * @brief Computation of the potential energy function.
- */
-
-#include <stddef.h>
-#include <math.h>
-#include <assert.h>
-
-#include <gsl/gsl_math.h>
-#include <gsl/gsl_vector.h>
-
-#include "protein.h"
-#include "contact-map.h"
-#include "potential.h"
+#include "molecular-simulator.h"
 
 
 static inline double pairwise_potential(const struct protein *self,

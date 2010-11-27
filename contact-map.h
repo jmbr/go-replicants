@@ -1,11 +1,5 @@
 #ifndef CONTACT_MAP_H
-#define CONTACT_MAP_H   1
-/**
- * @file contact_map.h
- */
-
-#include <stdio.h>
-#include <stddef.h>
+#define CONTACT_MAP_H
 
 
 struct protein;
@@ -26,4 +20,5 @@ extern double contact_map_get_distance(const struct contact_map *self,
                                        size_t i, size_t j);
 
 extern int contact_map_plot(const struct contact_map *self, FILE *gnuplot);
+
 #endif // !CONTACT_MAP_H

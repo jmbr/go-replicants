@@ -1,16 +1,5 @@
 #ifndef GEOMETRY_H
-#define GEOMETRY_H	1
-/**
- * @file geometry.h
- */
-
-#include <stdbool.h>
-
-#include <gsl/gsl_vector.h>
-#include <gsl/gsl_matrix.h>
-#include <gsl/gsl_blas.h>
-#include <gsl/gsl_rng.h>
-
+#define GEOMETRY_H
 
 extern void cross_product(const gsl_vector *u, const gsl_vector *v,
                           gsl_vector *result);
@@ -36,4 +25,5 @@ static inline void vector_normalize(gsl_vector *v)
 {
         gsl_vector_scale(v, 1.0/gsl_blas_dnrm2(v));
 }
+
 #endif // !GEOMETRY_H

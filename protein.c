@@ -1,27 +1,8 @@
-/**
- * @file protein.c
- */
+#include "molecular-simulator.h"
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdbool.h>
-#include <stdarg.h>
-#include <math.h>
-#include <assert.h>
 
-#include <gsl/gsl_math.h>
-#include <gsl/gsl_rng.h>
-#include <gsl/gsl_randist.h>
-#include <gsl/gsl_vector.h>
-#include <gsl/gsl_matrix.h>
-#include <gsl/gsl_blas.h>
-#include <gsl/gsl_linalg.h>
-
-#include "utils.h"
-#include "geometry.h"
-#include "protein.h"
-
-
+static struct protein *read_xyz_file(FILE *f);
+static int write_xyz_file(const struct protein *self, FILE *stream);
 
 static void protein_do_shift_move(struct protein *self, gsl_rng *rng, size_t k,
                                   bool undo);
@@ -32,7 +13,6 @@ static void protein_do_pivot_move(struct protein *self, gsl_rng *rng, size_t k,
 static void protein_do_end_move_first(struct protein *self, gsl_rng *rng, bool undo);
 static void protein_do_end_move_last(struct protein *self, gsl_rng *rng, bool undo);
 
-
 
 struct protein *new_protein(size_t num_atoms, const double *atom)
 {
@@ -93,50 +73,80 @@ struct protein *protein_dup(const struct protein *self)
 
 
 
-double protein_signum(const struct protein *self, size_t i, size_t j)
+struct protein *protein_read_xyz_file(const char *name)
 {
-        double s = 1.0;
+        FILE *f;
 
-        if (abs((int) (i - j)) == 3) {
-                gsl_vector *v0 = self->atom[i];
-                gsl_vector *v1 = self->atom[i+1];
-                gsl_vector *v2 = self->atom[i+2];
-                gsl_vector *v3 = self->atom[i+3];
+        if ((f = fopen(name, "r")) == NULL)
+                return NULL;
 
-                double uu[3], vv[3], ww[3];
-                gsl_vector_view u = gsl_vector_view_array((double *) &uu, 3);
-                gsl_vector_view v = gsl_vector_view_array((double *) &vv, 3);
-                gsl_vector_view w = gsl_vector_view_array((double *) &ww, 3);
+        struct protein *p = read_xyz_file(f);
 
-                gsl_vector_memcpy(&u.vector, v1);
-                gsl_vector_memcpy(&v.vector, v2);
-                gsl_vector_memcpy(&w.vector, v3);
+        fclose(f);
 
-                gsl_vector_sub(&u.vector, v0);
-                gsl_vector_sub(&v.vector, v1);
-                gsl_vector_sub(&w.vector, v2);
-
-                double d = triple_scalar_product(&u.vector, &v.vector, &w.vector);
-
-                s = d/fabs(d);
-        }
-
-        return s;
+        return p;
 }
 
-double protein_distance(const struct protein *self,
-                        size_t i, size_t j)
+struct protein *read_xyz_file(FILE *f)
 {
-        assert(self != NULL);
-        assert(i < self->num_atoms);
-        assert(j < self->num_atoms);
+        size_t num_atoms;
 
-        double data[] = {0, 0, 0};
-        gsl_vector_view v = gsl_vector_view_array((double *) &data, 3);
-        gsl_vector_memcpy(&v.vector, self->atom[j]);
-        gsl_vector_sub(&v.vector, self->atom[i]);
+        if (fscanf(f, "%u\n", &num_atoms) != 1)
+                return NULL;
 
-        return gsl_blas_dnrm2(&v.vector);
+        if (fscanf(f, "%*s") == EOF)
+                return NULL;
+
+        double *atom_tab = calloc(num_atoms, 3*sizeof(double));
+
+        for (size_t k = 0; k < num_atoms; k++) {
+                int status;
+                status = fscanf(f, "%*s %lg %lg %lg",
+                                atom_tab + 3*k + 0,
+                                atom_tab + 3*k + 1,
+                                atom_tab + 3*k + 2);
+                if (status != 3) {
+                        free(atom_tab);
+                        return NULL;
+                }
+        }
+
+        return new_protein(num_atoms, atom_tab);
+}
+
+
+
+int protein_write_xyz_file(const struct protein *self, const char *name)
+{
+        FILE *f;
+
+        if ((f = fopen(name, "w")) == NULL)
+                return -1;
+
+        int status = write_xyz_file(self, f);
+
+        fclose(f);
+
+        return status;
+}
+
+int write_xyz_file(const struct protein *self, FILE *stream)
+{
+        int status, n = 0;
+
+        fprintf(stream, "%u\n", self->num_atoms);
+        fprintf(stream, "Protein\n");
+        for (size_t i = 0; i < self->num_atoms; i++) {
+                status = fprintf(stream, "CA %g %g %g\n",
+                                 gsl_vector_get(self->atom[i], 0),
+                                 gsl_vector_get(self->atom[i], 1),
+                                 gsl_vector_get(self->atom[i], 2));
+                if (status < 0)
+                        return -1;
+                n += status;
+        }
+
+        return n;
 }
 
 
@@ -207,6 +217,54 @@ bool protein_is_overlapping(const struct protein *self)
 
 
 
+double protein_signum(const struct protein *self, size_t i, size_t j)
+{
+        double s = 1.0;
+
+        if (abs((int) (i - j)) == 3) {
+                gsl_vector *v0 = self->atom[i];
+                gsl_vector *v1 = self->atom[i+1];
+                gsl_vector *v2 = self->atom[i+2];
+                gsl_vector *v3 = self->atom[i+3];
+
+                double uu[3], vv[3], ww[3];
+                gsl_vector_view u = gsl_vector_view_array((double *) &uu, 3);
+                gsl_vector_view v = gsl_vector_view_array((double *) &vv, 3);
+                gsl_vector_view w = gsl_vector_view_array((double *) &ww, 3);
+
+                gsl_vector_memcpy(&u.vector, v1);
+                gsl_vector_memcpy(&v.vector, v2);
+                gsl_vector_memcpy(&w.vector, v3);
+
+                gsl_vector_sub(&u.vector, v0);
+                gsl_vector_sub(&v.vector, v1);
+                gsl_vector_sub(&w.vector, v2);
+
+                double d = triple_scalar_product(&u.vector, &v.vector, &w.vector);
+
+                s = d/fabs(d);
+        }
+
+        return s;
+}
+
+double protein_distance(const struct protein *self,
+                        size_t i, size_t j)
+{
+        assert(self != NULL);
+        assert(i < self->num_atoms);
+        assert(j < self->num_atoms);
+
+        double data[] = {0, 0, 0};
+        gsl_vector_view v = gsl_vector_view_array((double *) &data, 3);
+        gsl_vector_memcpy(&v.vector, self->atom[j]);
+        gsl_vector_sub(&v.vector, self->atom[i]);
+
+        return gsl_blas_dnrm2(&v.vector);
+}
+
+
+
 void protein_do_movement(struct protein *self, gsl_rng *rng,
                          enum protein_movements m, size_t k, bool undo)
 {
@@ -235,17 +293,16 @@ void protein_do_movement(struct protein *self, gsl_rng *rng,
         }
 }
 
-void protein_do_natural_movement(struct protein *self, gsl_rng *rng)
+void protein_do_natural_movement(struct protein *self, gsl_rng *rng, size_t k)
 {
-        static size_t k = 0;
+        dprintf("thread #%d is changing atom %u\n", omp_get_thread_num(), k);
 
-        ++k;
-        if (k >= self->num_atoms-2) /* XXX Fugly. */
-                k = 1;
-
-        protein_do_end_move_first(self, rng, true);
-        protein_do_movement(self, rng, (enum protein_movements) gsl_rng_uniform_int(rng, 3), k, true);
-        protein_do_end_move_last(self, rng, true);
+        if (k == 1)
+                protein_do_end_move_first(self, rng, true);
+        else if (1 < k && k < self->num_atoms-2)
+                protein_do_movement(self, rng, (enum protein_movements) gsl_rng_uniform_int(rng, 3), k, true);
+        else
+                protein_do_end_move_last(self, rng, true);
 }
 
 
@@ -475,40 +532,7 @@ void protein_do_pivot_move(struct protein *self, gsl_rng *rng, size_t k, bool un
 void protein_scramble(struct protein *self, gsl_rng *rng)
 {
         for (size_t r = 0; r < 10*self->num_atoms; r++)
-                protein_do_natural_movement(self, rng);
+                for (size_t k = 0; k < self->num_atoms; k++)
+                        protein_do_natural_movement(self, rng, k);
 }
 
-
-
-static int write_to_xyz_file(const struct protein *self, FILE *stream)
-{
-        int status, n = 0;
-
-        fprintf(stream, "%u\n", self->num_atoms);
-        fprintf(stream, "Protein\n");
-        for (size_t i = 0; i < self->num_atoms; i++) {
-                status = fprintf(stream, "CA %g %g %g\n",
-                                 gsl_vector_get(self->atom[i], 0),
-                                 gsl_vector_get(self->atom[i], 1),
-                                 gsl_vector_get(self->atom[i], 2));
-                if (status < 0)
-                        return -1;
-                n += status;
-        }
-
-        return n;
-}
-
-int protein_write_to_xyz_file(const struct protein *self, const char *name)
-{
-        FILE *f;
-
-        if ((f = fopen(name, "w")) == NULL)
-                return -1;
-
-        int status = write_to_xyz_file(self, f);
-
-        fclose(f);
-
-        return status;
-}

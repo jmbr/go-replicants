@@ -1,23 +1,5 @@
-/**
- * @file test-simulation.c
- */
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdbool.h>
-#include <math.h>
-#include <assert.h>
-#include <unistd.h>
-
-#include <gsl/gsl_math.h>
-#include <gsl/gsl_const.h>
-
-#include "geometry.h"
-#include "protein.h"
-#include "potential.h"
-#include "contact-map.h"
-#include "utils.h"
-#include "simulation.h"
+#undef NDEBUG
+#include "molecular-simulator.h"
 
 
 static bool plot_results = false;
@@ -52,21 +34,30 @@ int main(int argc, char *argv[])
 
 static void show_progress(struct simulation *s, size_t k)
 {
-        if (k != 1 && k % 10000 != 0)
+        if (k != 1 || k % 10000 != 0)
                 return;
 
         if (plot_results)
                 protein_plot(s->protein, s->gnuplot,
                              "#%u (%g).  Acceptance: %2.03g%%",
                              k, s->energy, simulation_get_acceptance_ratio(s));
-        printf("Progress %1.3g%% (%g/%g)                    \r",
+
+        printf("Progress %1.3g%% (%g/%g)\n",
                100*s->energy/s->orig_energy, s->energy, s->orig_energy);
+        fflush(stdout);
 }
 
 static void simulate_fragment(size_t start, size_t end)
 {
-        struct simulation *s = new_simulation(new_truncated_1pgb(start, end), 10, 0.1);
-        assert(s != NULL);
+        gsl_rng *rng = gsl_rng_alloc(gsl_rng_default);
+        gsl_rng_env_setup();
+        gsl_rng_set(rng, gsl_rng_default_seed);
+
+        struct simulation_options opts = { .d_max = 10, .a = 0.7 };
+        struct protein *p = new_truncated_1pgb(start, end);
+        struct simulation *s = new_simulation(p, rng, 1.0, &opts);
+        assert(p != NULL && s != NULL);
+        delete_protein(p);
 
         printf("Simulating fragment #%2u-%2u of 1PGB.\n", start, end);
 
@@ -92,15 +83,16 @@ static void simulate_fragment(size_t start, size_t end)
 
         printf("\nEnergy after simulation: %g\n", s->energy);
 
-        delete_protein(s->protein);
+        gsl_rng_free(rng);
         delete_simulation(s);
 }
 
 void test_simulation(void)
 {
-        simulate_fragment(0, 6);
+        simulate_fragment(0, 3);
         simulate_fragment(6, 10);
         /* simulate_fragment(0, 15); */
+        /* simulate_fragment(20, 30); */
 }
 
 struct protein *new_truncated_1pgb(size_t start, size_t end)

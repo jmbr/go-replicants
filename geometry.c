@@ -1,20 +1,4 @@
-/**
- * @file geometry.h
- */
-
-#include <stddef.h>
-#include <stdbool.h>
-#include <assert.h>
-
-#include <gsl/gsl_vector.h>
-#include <gsl/gsl_matrix.h>
-#include <gsl/gsl_blas.h>
-#include <gsl/gsl_rng.h>
-#include <gsl/gsl_randist.h>
-#include <gsl/gsl_math.h>
-
-#include "utils.h"
-#include "geometry.h"
+#include "molecular-simulator.h"
 
 
 static void make_random_unit_quaternion(gsl_vector *Q, gsl_rng *rng);
@@ -43,11 +27,14 @@ double triple_scalar_product(const gsl_vector *u,
                              const gsl_vector *v,
                              const gsl_vector *w)
 {
-        double result;
-        declare_stack_allocated_vector(vxw, 3);
+        double space[3];
+        gsl_block b = block_init(3, space);
+        gsl_vector vxw = vector_init(b, 0, 3, 1);
+        /* declare_stack_allocated_vector(vxw, 3); */
+        cross_product(v, w, &vxw);
 
-        cross_product(v, w, vxw);
-        gsl_blas_ddot(u, vxw, &result);
+        double result;
+        gsl_blas_ddot(u, &vxw, &result);
 
         return result;
 }

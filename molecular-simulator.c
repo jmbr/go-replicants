@@ -1,12 +1,4 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-
-#include <gsl/gsl_math.h>
-
-#include "protein.h"
-#include "potential.h"
-#include "simulation.h"
+#include "molecular-simulator.h"
 
 
 static struct {
@@ -15,13 +7,11 @@ static struct {
         double temperature;
 } options = { false, NULL, GSL_NEGINF };
 
-
 static FILE *gp;
 
 
 static int process_cmd_args(int argc, char *argv[],
                             struct protein **orig, struct protein **initial);
-static struct protein *read_xyz_file(const char *name);
 static void print_usage(void);
 static void show_progress(struct simulation *s, size_t k);
 
@@ -32,6 +22,7 @@ static void plot_protein_and_sleep(const struct simulation *s)
         if (options.plot_results) {
                 protein_plot(s->protein, s->gnuplot,
                              "Potential energy: %g.", s->energy);
+                sleep(3);
         }
 }
 
@@ -47,17 +38,22 @@ int main(int argc, char *argv[])
                 exit(EXIT_FAILURE);
         }
 
+        gsl_rng *rng = gsl_rng_alloc(gsl_rng_default);
+        gsl_rng_env_setup();
+        gsl_rng_set(rng, gsl_rng_default_seed);
 
-        struct simulation_options opts = { .d_max = 7.5, .a = 1.0, .T = options.temperature };
-        struct simulation *s = new_simulation(orig, &opts);
+        struct simulation_options opts = { .d_max = 7.5, .a = 1.0 };
+        struct simulation *s = new_simulation(orig, rng, options.temperature, &opts);
+        if (s == NULL) {
+                fprintf(stderr, "Unable to set up simulation.\n");
+                exit(EXIT_FAILURE);
+        }
 
         plot_protein_and_sleep(s);
 
-        printf("Simulating at temperature %2.2g with d_max == %g, a == %g.\n",
-               s->T, s->d_max, s->a);
+        simulation_print_info(s, stdout);
 
-        gp = popen("gnuplot -p", "w");
-        if (gp == NULL) {
+        if ((gp = popen("gnuplot -p", "w")) == NULL) {
                 fprintf(stderr, "Unable to launch Gnuplot.\n");
                 exit(EXIT_FAILURE);
         }
@@ -120,13 +116,13 @@ int process_cmd_args(int argc, char *argv[],
                 return -1;
         }
 
-        if ((*orig = read_xyz_file(argv[optind])) == NULL) {
+        if ((*orig = protein_read_xyz_file(argv[optind])) == NULL) {
                 fprintf(stderr, "Unable to read %s.\n", argv[optind]);
                 return -1;
         }
 
         if (options.resume_file != NULL) {
-                if ((*initial = read_xyz_file(options.resume_file)) == NULL) {
+                if ((*initial = protein_read_xyz_file(options.resume_file)) == NULL) {
                         fprintf(stderr, "Unable to read %s.\n", options.resume_file);
                         return -1;
                 }
@@ -137,59 +133,17 @@ int process_cmd_args(int argc, char *argv[],
 
 void print_usage(void)
 {
-        fprintf(stderr, "Usage: simulator [-g] [-r restart-file] source-file\n");
+        fprintf(stderr, "Usage: molecular-simulator [-g] [-r restart-file] source-file\n");
 }
 
 
-
-static struct protein *do_read_xyz_file(FILE *f)
-{
-        size_t num_atoms;
-
-        if (fscanf(f, "%u\n", &num_atoms) != 1)
-                return NULL;
-
-        if (fscanf(f, "%*s") == EOF)
-                return NULL;
-
-        double *atom_tab = calloc(num_atoms, 3*sizeof(double));
-
-        for (size_t k = 0; k < num_atoms; k++) {
-                int status;
-                status = fscanf(f, "%*s %lg %lg %lg",
-                                (atom_tab + 3*k + 0), 
-                                (atom_tab + 3*k + 1), 
-                                (atom_tab + 3*k + 2));
-                if (status != 3) {
-                        free(atom_tab);
-                        return NULL;
-                }
-        }
-
-        return new_protein(num_atoms, atom_tab);
-}
-
-struct protein *read_xyz_file(const char *name)
-{
-        FILE *f;
-
-        if ((f = fopen(name, "r")) == NULL)
-                return NULL;
-
-        struct protein *p = do_read_xyz_file(f);
-
-        fclose(f);
-
-        return p;
-}
-
 
 void show_progress(struct simulation *s, size_t k)
 {
         if (k != 1 && k % 10000 != 0)
                 return;
 
-        protein_write_to_xyz_file(s->protein, "latest.xyz");
+        protein_write_xyz_file(s->protein, "latest.xyz");
 
         if (options.plot_results) {
                 protein_plot(s->protein, s->gnuplot,

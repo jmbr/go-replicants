@@ -1,17 +1,5 @@
 #ifndef PROTEIN_H
 #define PROTEIN_H
-/**
- * @file protein.h
- */
-
-#include <stdio.h>
-#include <stddef.h>
-#include <stdbool.h>
-
-#include <gsl/gsl_rng.h>
-#include <gsl/gsl_vector.h>
-#include <gsl/gsl_matrix.h>
-
 
 /** Coarse-grained protein structure. */
 struct protein {
@@ -37,8 +25,8 @@ extern void delete_protein(struct protein *self);
 
 extern struct protein *protein_dup(const struct protein *self);
 
-extern double protein_signum(const struct protein *self, size_t i, size_t j);
-extern double protein_distance(const struct protein *self, size_t i, size_t j);
+extern struct protein *protein_read_xyz_file(const char *name);
+extern int protein_write_xyz_file(const struct protein *self, const char *name);
 
 extern void protein_plot(const struct protein *self, FILE *gnuplot,
                          const char *title_format, ...)
@@ -46,15 +34,16 @@ extern void protein_plot(const struct protein *self, FILE *gnuplot,
 
 extern int protein_print_atoms(const struct protein *self, FILE *stream);
 
+extern double protein_signum(const struct protein *self, size_t i, size_t j);
+extern double protein_distance(const struct protein *self, size_t i, size_t j);
+
 extern bool protein_is_overlapping(const struct protein *self);
 #define protein_is_not_overlapping(p)   !protein_is_overlapping(p)
 
 extern void protein_do_movement(struct protein *self, gsl_rng *rng,
                                 enum protein_movements m, size_t k, bool undo);
-extern void protein_do_natural_movement(struct protein *self, gsl_rng *rng);
+extern void protein_do_natural_movement(struct protein *self, gsl_rng *rng, size_t k);
 
 extern void protein_scramble(struct protein *self, gsl_rng *rng);
 
-extern int protein_write_to_xyz_file(const struct protein *self,
-                                     const char *name);
 #endif // !PROTEIN_H

@@ -1,16 +1,4 @@
-/**
- * @file contact_map.c
- */
-
-#include <stdio.h>
-#include <stddef.h>
-#include <stdlib.h>
-#include <assert.h>
-
-#include <gsl/gsl_math.h>
-
-#include "protein.h"
-#include "contact-map.h"
+#include "molecular-simulator.h"
 
 
 struct contact_map {

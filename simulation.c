@@ -1,42 +1,31 @@
-/**
- * @file simulation.c
- */
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdbool.h>
-#include <math.h>
-#include <assert.h>
-
-#include <gsl/gsl_const.h>
-#include <gsl/gsl_math.h>
-#include <gsl/gsl_rng.h>
-
-#include "utils.h"
-#include "protein.h"
-#include "potential.h"
-#include "contact-map.h"
-#include "simulation.h"
+#include "molecular-simulator.h"
 
 
 const size_t simulation_save_step = 10000;
 
 const char gnuplot_command_line[] = GNUPLOT_EXECUTABLE " -persist";
 
-
+const size_t bufsize = 1024;
+const char configurations_file_template[] = "configurations--t-%02.02f--dmax-%02.02f--a-%02.02f.dat";
+const char energies_file_template[] = "energies--t-%02.02f--dmax-%02.02f--a-%02.02f.dat";
 
-struct simulation *new_simulation(struct protein *p,
+
+struct simulation *new_simulation(const struct protein *p,
+                                  gsl_rng *rng,
+                                  double temperature,
                                   const struct simulation_options *opts)
 {
-        if (p == NULL || opts == NULL || opts->d_max <= 0.0 || opts->a <= 0.0)
+        if (p == NULL || rng == NULL || opts == NULL
+            || opts->d_max <= 0.0 || opts->a <= 0.0)
+        {
+                return NULL;
+        }
+
+        struct simulation *s = calloc(1, sizeof(struct simulation));
+        if (s == NULL)
                 return NULL;
 
-        struct simulation *s;
-
-        if ((s = calloc(1, sizeof(struct simulation))) == NULL)
-                return NULL;
-
-        s->protein = p;
+        s->protein = protein_dup(p);
 
         /* Initialize native contact map. */
         s->d_max = opts->d_max;
@@ -45,15 +34,12 @@ struct simulation *new_simulation(struct protein *p,
 
         s->a = opts->a;
 
-        s->T = opts->T;
+        s->T = temperature;
 
         /* Compute the potential energy for the protein. */
         s->orig_energy = s->energy = potential(s->protein, s->native_map, s->a);
 
-        /* Initialize the pseudo-random number generator. */
-        s->rng = gsl_rng_alloc(gsl_rng_default);
-        gsl_rng_env_setup();
-        gsl_rng_set(s->rng, gsl_rng_default_seed);
+        s->rng = rng;
 
         if ((s->gnuplot = popen(gnuplot_command_line, "w")) == NULL)
                 delete_simulation(s);
@@ -61,9 +47,17 @@ struct simulation *new_simulation(struct protein *p,
         s->accepted = 0;
         s->total = 0;
 
-        s->configurations = fopen("configurations.dat", "w");
-        s->energies = fopen("energies.dat", "w");
-        /* XXX Error-checking. */
+        char name1[bufsize], name2[bufsize];
+        sprintf(name1, configurations_file_template, s->T, s->d_max, s->a);
+        sprintf(name2, energies_file_template, s->T, s->d_max, s->a);
+        s->configurations = fopen(name1, "w");
+        s->energies = fopen(name2, "w");
+        if (s->configurations == NULL || s->energies == NULL) {
+                delete_simulation(s);
+                return NULL;
+        }
+
+        s->next_atom = 1;
 
         return s;
 }
@@ -74,14 +68,14 @@ void delete_simulation(struct simulation *self)
 
         if (self->gnuplot != NULL)
                 pclose(self->gnuplot);
-        if (self->protein != NULL)
+        if (self->native_map != NULL)
                 delete_contact_map(self->native_map);
-        if (self->rng != NULL)
-                gsl_rng_free(self->rng);
         if (self->configurations != NULL)
                 fclose(self->configurations);
         if (self->energies != NULL)
                 fclose(self->energies);
+        if (self->protein != NULL)
+                delete_protein(self->protein);
 
         free(self);
 }
@@ -110,10 +104,6 @@ static void simulation_save_state(const struct simulation *self)
 
         fprintf(self->energies, "%e\n", self->energy);
         fflush(self->energies);
-
-        /* fputs("set terminal wxt noraise 1\n" */
-        /*       "plot 'energies.dat' title 'Potential energy' with lines\n", */
-        /*       self->gnuplot); */
 }
 
 void simulation_first_iteration(struct simulation *self)
@@ -138,17 +128,16 @@ void simulation_next_iteration(struct simulation *self)
         if (self->total % simulation_save_step == 0)
                 simulation_save_state(self);
 
-        struct protein *candidate, *current = self->protein;
+        struct protein *current = self->protein;
+        struct protein *candidate = protein_dup(current);
+        assert(candidate != NULL); /* XXX Check this properly. */
 
-        candidate = protein_dup(current);
-        assert(candidate != NULL);
-        protein_do_natural_movement(candidate, self->rng);
+        protein_do_natural_movement(candidate, self->rng, self->next_atom);
+        self->next_atom = (self->next_atom + 1) % self->protein->num_atoms;
 
         const double U1 = compute_potential_energy(current, self);
         const double U2 = compute_potential_energy(candidate, self);
         const double DU = U2 - U1;
-
-        dprintf("U1 == %g, U2 == %g, DU == %g\n", U1, U2, U2-U1);
 
         struct protein *chosen;
 
@@ -156,12 +145,8 @@ void simulation_next_iteration(struct simulation *self)
                 chosen = candidate;
         else {
                 const double r = gsl_rng_uniform(self->rng);
-                /* const double p = -1.0/(GSL_CONST_MKSA_BOLTZMANN*self->T)*DU; */
                 const double p = -1.0/self->T*DU;
-
-                chosen =  r < gsl_min(1.0, exp(p)) ? candidate : current;
-
-                dprintf("r == %g, -1/T*DU == %g\n", r, p);
+                chosen = r < gsl_min(1.0, exp(p)) ? candidate : current;
         }
 
         if (chosen == candidate) {
@@ -179,4 +164,14 @@ bool simulation_has_converged(const struct simulation *self)
         assert(self != NULL);
 
         return gsl_fcmp(self->orig_energy, self->energy, 1e-3) == 0;
+}
+
+
+
+void simulation_print_info(const struct simulation *self, FILE *stream)
+{
+        assert(self != NULL);
+
+        fprintf(stream, "simulation (T = %02.2f, a = %2.1f, d_max = %2.1f)\n",
+                self->T, self->a, self->d_max);
 }

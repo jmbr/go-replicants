@@ -1,12 +1,5 @@
 #ifndef UTILS_H
-#define UTILS_H         1
-/**
- * @file utils.h
- */
-
-#include <gsl/gsl_vector.h>
-#include <gsl/gsl_matrix.h>
-
+#define UTILS_H
 
 /*
  * Some macros useful for allocating vectors on the stack.

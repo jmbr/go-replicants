@@ -1,28 +1,5 @@
-/**
- * @file test-protein.c
- * @brief Unit test for the protein data structure.
- */
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdbool.h>
-#include <stdarg.h>
-#include <math.h>
-#include <time.h>
-#include <getopt.h>
-#include <unistd.h>
 #undef NDEBUG
-#include <assert.h>
-
-#include <gsl/gsl_math.h>
-#include <gsl/gsl_rng.h>
-#include <gsl/gsl_vector.h>
-
-#include "utils.h"
-#include "geometry.h"
-#include "simulation.h"
-#include "potential.h"
-#include "protein.h"
+#include "molecular-simulator.h"
 
 
 static bool plot_results = false;

@@ -1,19 +1,5 @@
-/**
- * @file test-contact-map.c
- */
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdbool.h>
-#include <getopt.h>
 #undef NDEBUG
-#include <assert.h>
-
-#include <gsl/gsl_math.h>
-
-#include "protein.h"
-#include "potential.h"
-#include "contact-map.h"
+#include "molecular-simulator.h"
 
 
 static bool plot_results = false;
