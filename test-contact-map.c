@@ -47,9 +47,9 @@ void test_initialization_and_finalization(void)
                 FILE *g = popen("gnuplot --persist", "w");
                 assert(g != NULL);
 
-                contact_map_plot(c1, g);
+                contact_map_plot(c1, g, "");
                 getchar();
-                contact_map_plot(c2, g);
+                contact_map_plot(c2, g, "");
 
                 pclose(g);
         }

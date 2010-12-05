@@ -118,7 +118,6 @@ void test_movements(void)
         /*                            {5.0*3.8, 0, 0}}; */
         /* const size_t num_atoms = 7; */
 
-        bool undo = true;
         struct protein *n;
         struct protein *(*constructor)(void) = new_protein_1pgb;
 
@@ -132,14 +131,14 @@ void test_movements(void)
         n = constructor();
         for (size_t i = 0; i < 100; i++) {
                 protein_plot(n, g, "End chain movement (1)");
-                protein_do_movement(n, r, PROTEIN_END_MOVE_FIRST, 0, undo);
+                protein_do_movement(n, r, PROTEIN_END_MOVE_FIRST, 0);
         }
         delete_protein(n);
         sleep(3);
 
         n = constructor();
         for (size_t i = 0; i < 100; i++) {
-                protein_do_movement(n, r, PROTEIN_END_MOVE_LAST, 0, undo);
+                protein_do_movement(n, r, PROTEIN_END_MOVE_LAST, 0);
                 protein_plot(n, g, "End chain movement (2)");
         }
         delete_protein(n);
@@ -147,7 +146,7 @@ void test_movements(void)
 
         n = constructor();
         for (size_t i = 0; i < 250; i++) {
-                protein_do_movement(n, r, PROTEIN_SHIFT_MOVE, 1, undo);
+                protein_do_movement(n, r, PROTEIN_SHIFT_MOVE, 1);
                 protein_plot(n, g, "Shifting movement");
         }
         delete_protein(n);
@@ -155,7 +154,7 @@ void test_movements(void)
 
         n = constructor();
         for (size_t i = 0; i < 250; i++) {
-                protein_do_movement(n, r, PROTEIN_SPIKE_MOVE, 1, undo);
+                protein_do_movement(n, r, PROTEIN_SPIKE_MOVE, 1);
                 protein_plot(n, g, "Spike movement");
         }
         delete_protein(n);
@@ -163,7 +162,7 @@ void test_movements(void)
 
         n = constructor();
         for (size_t i = 0; i < 250; i++) {
-                protein_do_movement(n, r, PROTEIN_PIVOT_MOVE, 52, undo);
+                protein_do_movement(n, r, PROTEIN_PIVOT_MOVE, 52);
                 protein_plot(n, g, "Pivoting movement");
         }
         delete_protein(n);

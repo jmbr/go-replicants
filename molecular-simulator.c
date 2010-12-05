@@ -1,103 +1,91 @@
 #include "molecular-simulator.h"
 
+static bool setup_only = false;
+static bool simulate_only = false;
+static bool resume_simulation = false;
 
-static struct {
-        bool plot_results;
-        char *resume_file;
-        double temperature;
-} options = { false, NULL, GSL_NEGINF };
+static struct option cmd_options[] = {
+	{"resume", no_argument, (int *) &resume_simulation, true},
+        {"temperature", required_argument, NULL, 't'},
+        {"dmax", required_argument, NULL, 'd'},
+        {"a", required_argument, NULL, 'a'},
+        {"setup-only", no_argument, (int *) &setup_only, true},
+        {"simulate-only", no_argument, (int *) &simulate_only, true},
+        {"help", no_argument, NULL, 'h'},
+        {0, 0, 0, 0}
+};
 
-static FILE *gp;
-
-
-static int process_cmd_args(int argc, char *argv[],
-                            struct protein **orig, struct protein **initial);
+static int parse_args(int argc, char *argv[], struct simulation_options *opts);
 static void print_usage(void);
-static void show_progress(struct simulation *s, size_t k);
+static void show_progress(const struct replicas *r, size_t k);
 
-
-
-static void plot_protein_and_sleep(const struct simulation *s)
-{
-        if (options.plot_results) {
-                protein_plot(s->protein, s->gnuplot,
-                             "Potential energy: %g.", s->energy);
-                sleep(3);
-        }
-}
 
 int main(int argc, char *argv[])
 {
-        struct protein *orig = NULL, *initial = NULL;
-
-        if (process_cmd_args(argc, argv, &orig, &initial) == -1) {
-                if (orig)
-                        delete_protein(orig);
-                if (initial)
-                        delete_protein(initial);
-                exit(EXIT_FAILURE);
-        }
-
         gsl_rng *rng = gsl_rng_alloc(gsl_rng_default);
         gsl_rng_env_setup();
-        gsl_rng_set(rng, gsl_rng_default_seed);
+        gsl_rng_set(rng, gsl_rng_default_seed); /* XXX Should be a command line option. */
 
-        struct simulation_options opts = { .d_max = 7.5, .a = 1.0 };
-        struct simulation *s = new_simulation(orig, rng, options.temperature, &opts);
-        if (s == NULL) {
-                fprintf(stderr, "Unable to set up simulation.\n");
+        const size_t max_temperatures = 256;
+        double temperatures[max_temperatures];
+        struct simulation_options opts = {
+                rng, 0.0, 0.0, 0, (double *) &temperatures
+        };
+
+        if (parse_args(argc, argv, &opts) == -1)
+                exit(EXIT_FAILURE);
+
+        struct protein *p = protein_read_xyz_file(argv[optind++]);
+        if (p == NULL) {
+                perror("protein_read_xyz_file");
                 exit(EXIT_FAILURE);
         }
 
-        plot_protein_and_sleep(s);
-
-        simulation_print_info(s, stdout);
-
-        if ((gp = popen("gnuplot -p", "w")) == NULL) {
-                fprintf(stderr, "Unable to launch Gnuplot.\n");
+        if (resume_simulation && argc - optind != opts.num_replicas) {
+                fprintf(stderr, "The number of temperatures does not match "
+                        "the number of configuration files.\n");
                 exit(EXIT_FAILURE);
         }
+
+        struct replicas *r = new_replicas(p, &opts);
+
+        printf("Running thermalization phase.\n");
+
+        replicas_thermalize(r, 35000);
+
+        if (setup_only)
+                exit(EXIT_SUCCESS);
         
-        if (initial != NULL) {
-                delete_protein(s->protein);
-                s->protein = initial;
-                s->energy = potential(s->protein, s->native_map, s->a);
-        } else {
-                simulation_first_iteration(s);
-        }
-
-        plot_protein_and_sleep(s);
-
+        printf("Running production phase.\n");
         size_t k = 1;
-        /* while (simulation_has_not_converged(s)) { */
+        /* while (replicas_have_not_converged(r)) { */
         while (true) {
-                simulation_next_iteration(s);
-                show_progress(s, k);
+                replicas_next_iteration(r);
+                show_progress(r, k);
                 ++k;
         }
-        
-        fclose(gp);
-        delete_protein(s->protein);
-        delete_simulation(s);
+
         exit(EXIT_SUCCESS);
 }
 
 
 
-int process_cmd_args(int argc, char *argv[],
-                     struct protein **orig, struct protein **initial)
+int parse_args(int argc, char *argv[], struct simulation_options *opts)
 {
-        int opt;
-        while ((opt = getopt(argc, argv, "t:r:gh")) != -1) {
-                switch (opt) {
+        while (true) {
+                int c = getopt_long_only(argc, argv, "", cmd_options, 0);
+                if (c == -1)
+                        break;
+                
+                switch (c) {
                 case 't':
-                        options.temperature = atof(optarg);
+                        opts->temperatures[opts->num_replicas++] = atof(optarg);
                         break;
-                case 'r':
-                        options.resume_file = optarg;
+                case 'd':
+                        opts->d_max = atof(optarg);
                         break;
-                case 'g':
-                        options.plot_results = true;
+                case 'a':
+                        opts->a = atof(optarg);
                         break;
                 case 'h':
                         print_usage();
@@ -105,27 +93,9 @@ int process_cmd_args(int argc, char *argv[],
                 }
         }
 
-        if (optind >= argc) {
+        if (opts->d_max <= 0.0 || opts->a <= 0.0 || opts->num_replicas == 0) {
                 print_usage();
                 return -1;
-        }
-
-        if (options.temperature == GSL_NEGINF) {
-                fprintf(stderr, "You must specify a value for the temperature.\n");
-                print_usage();
-                return -1;
-        }
-
-        if ((*orig = protein_read_xyz_file(argv[optind])) == NULL) {
-                fprintf(stderr, "Unable to read %s.\n", argv[optind]);
-                return -1;
-        }
-
-        if (options.resume_file != NULL) {
-                if ((*initial = protein_read_xyz_file(options.resume_file)) == NULL) {
-                        fprintf(stderr, "Unable to read %s.\n", options.resume_file);
-                        return -1;
-                }
         }
 
         return 0;
@@ -133,30 +103,25 @@ int process_cmd_args(int argc, char *argv[],
 
 void print_usage(void)
 {
-        fprintf(stderr, "Usage: molecular-simulator [-g] [-r restart-file] source-file\n");
+        fprintf(stderr,
+                "Usage: molecular-simulator [-r] -d VALUE -a VALUE "
+                "-t VALUE [-t VALUE ...] PROTEIN-FILE [CONFORMATION-FILE ...]\n");
 }
 
-
-
-void show_progress(struct simulation *s, size_t k)
+void show_progress(const struct replicas *r, size_t k)
 {
-        if (k != 1 && k % 10000 != 0)
+        if (k != 1 && k % 100 != 0)
                 return;
 
-        protein_write_xyz_file(s->protein, "latest.xyz");
+        printf("total number of exchanges: %u\n", replicas_total_exchanges(r));
+        replicas_print_info(r, stdout);
 
-        if (options.plot_results) {
-                protein_plot(s->protein, s->gnuplot,
-                             "#%u (%g).  Acceptance: %2.03g",
-                             k, s->energy, simulation_get_acceptance_ratio(s));
-
-                if (k % 100000 == 0)
-                        fprintf(gp,
-                        "set terminal wxt noraise\n"
-                        "set grid\n"
-                        "plot 'energies.dat' title 'Potential energy' with lines\n");
+        for (size_t j = 0; j < r->num_replicas; j++) {
+                struct simulation *s = r->replica[j];
+                simulation_print_info(s, stdout);
+                printf("progress for replica %u: %g/%g\n",
+                       j, s->energy, r->orig_energy);
         }
-        
-        printf("Progress %1.3g%% (%g/%g)                    \r",
-               100*s->energy/s->orig_energy, s->energy, s->orig_energy);
+
+        fflush(stdout);
 }

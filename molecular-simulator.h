@@ -3,10 +3,14 @@
 #include <stdint.h>
 #include <stdarg.h>
 #include <stdbool.h>
-#include <math.h>
-#include <time.h>
-#include <unistd.h>
+#include <string.h>
 #include <assert.h>
+#include <math.h>
+#include <limits.h>
+#include <getopt.h>
+#include <unistd.h>
+#include <time.h>
+#include <sys/time.h>
 
 #include <gsl/gsl_const.h>
 #include <gsl/gsl_math.h>

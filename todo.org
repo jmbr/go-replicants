@@ -1,0 +1,29 @@
+#+TITLE: Molecular simulator TODO list.
+#+STARTUP: showall
+#+OPTIONS: toc:0
+
+* Bugs
+** TODO Restructure the memory layout of the contact maps because we no longer consider adjacent atoms as forming a native contact.
+** TODO The parameter d_max should only be taken into account in the potential function when |i - j| >= 4.
+** TODO Thoroughly test the contact map and potential energy modules.
+** TODO How can it be that in spite of a RMSD of 2.1A there are still about 20 native contacts yet to be formed?
+* Pending
+** Optimize computation of the potential function
+*** Is a Verlet list feasible? Nope.
+*** It may be possible to compute only the differences between potentials instead of the whole potential and then 
+*** It can be computed in parallel (use #pragma omp for reduce(U:+) )
+** TODO Optimize overlapping detection code
+** TODO Review the triple scalar product.
+Is it possible to compute its sign without computing the whole value?
+Actually, we want to determine whether a basis o vectors is positively
+oriented or not.  It might be better to use a determinant or a
+function that computes its sign directly.
+** TODO Review code
+** TODO Heat capacity (C_v) calculation
+** TODO Cross-compile to Win32
+** TODO Replace applications of rotation matrices by calls to BLAS' DROT
+** TODO See if there is something wrong with the RMSD and implement Rg
+It might be that RMSD uses an affinity while we need an euclidean transformation.
+* Finished
+** DONE Implement capability to resume simulations
+** DONE Automatically plot and refresh energies

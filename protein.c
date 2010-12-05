@@ -1,17 +1,11 @@
 #include "molecular-simulator.h"
 
 
-static struct protein *read_xyz_file(FILE *f);
-static int write_xyz_file(const struct protein *self, FILE *stream);
-
-static void protein_do_shift_move(struct protein *self, gsl_rng *rng, size_t k,
-                                  bool undo);
-static void protein_do_spike_move(struct protein *self, gsl_rng *rng, size_t k,
-                                  bool undo);
-static void protein_do_pivot_move(struct protein *self, gsl_rng *rng, size_t k,
-                                  bool undo);
-static void protein_do_end_move_first(struct protein *self, gsl_rng *rng, bool undo);
-static void protein_do_end_move_last(struct protein *self, gsl_rng *rng, bool undo);
+static bool protein_do_shift_move(struct protein *self, gsl_rng *rng, size_t k);
+static bool protein_do_spike_move(struct protein *self, gsl_rng *rng, size_t k);
+static bool protein_do_pivot_move(struct protein *self, gsl_rng *rng, size_t k);
+static bool protein_do_end_move_first(struct protein *self, gsl_rng *rng);
+static bool protein_do_end_move_last(struct protein *self, gsl_rng *rng);
 
 
 struct protein *new_protein(size_t num_atoms, const double *atom)
@@ -80,28 +74,28 @@ struct protein *protein_read_xyz_file(const char *name)
         if ((f = fopen(name, "r")) == NULL)
                 return NULL;
 
-        struct protein *p = read_xyz_file(f);
+        struct protein *p = protein_read_xyz(f);
 
         fclose(f);
 
         return p;
 }
 
-struct protein *read_xyz_file(FILE *f)
+struct protein *protein_read_xyz(FILE *stream)
 {
         size_t num_atoms;
 
-        if (fscanf(f, "%u\n", &num_atoms) != 1)
+        if (fscanf(stream, "%u\n", &num_atoms) != 1)
                 return NULL;
 
-        if (fscanf(f, "%*s") == EOF)
+        if (fscanf(stream, "%*s") == EOF)
                 return NULL;
 
         double *atom_tab = calloc(num_atoms, 3*sizeof(double));
 
         for (size_t k = 0; k < num_atoms; k++) {
                 int status;
-                status = fscanf(f, "%*s %lg %lg %lg",
+                status = fscanf(stream, "%*s %lg %lg %lg",
                                 atom_tab + 3*k + 0,
                                 atom_tab + 3*k + 1,
                                 atom_tab + 3*k + 2);
@@ -123,19 +117,19 @@ int protein_write_xyz_file(const struct protein *self, const char *name)
         if ((f = fopen(name, "w")) == NULL)
                 return -1;
 
-        int status = write_xyz_file(self, f);
+        int status = protein_write_xyz(self, f);
 
         fclose(f);
 
         return status;
 }
 
-int write_xyz_file(const struct protein *self, FILE *stream)
+int protein_write_xyz(const struct protein *self, FILE *stream)
 {
         int status, n = 0;
 
-        fprintf(stream, "%u\n", self->num_atoms);
-        fprintf(stream, "Protein\n");
+        fprintf(stream, "%u\n"
+                        "Protein\n", self->num_atoms);
         for (size_t i = 0; i < self->num_atoms; i++) {
                 status = fprintf(stream, "CA %g %g %g\n",
                                  gsl_vector_get(self->atom[i], 0),
@@ -145,6 +139,8 @@ int write_xyz_file(const struct protein *self, FILE *stream)
                         return -1;
                 n += status;
         }
+
+        fflush(stream);
 
         return n;
 }
@@ -157,8 +153,6 @@ void protein_plot(const struct protein *self, FILE *gnuplot,
         assert(self != NULL);
         assert(gnuplot != NULL);
 
-        fprintf(gnuplot, "set terminal wxt 0 noraise\n");
-
         va_list ap;
         fprintf(gnuplot, "set title '");
         va_start(ap, title_format);
@@ -166,16 +160,23 @@ void protein_plot(const struct protein *self, FILE *gnuplot,
         va_end(ap);
         fprintf(gnuplot, "'\n");
 
-        fprintf(gnuplot, "set view equal xyz\n"
+        fprintf(gnuplot, "set terminal wxt noraise\n"
+                         "set view equal xyz\n"
                          "set linetype 1 linecolor palette z linewidth 5\n"
                          "unset tics\n"
                          "unset border\n"
                          "unset colorbox\n"
-                         "splot '-' title '' with lines\n");
+                         "splot '-' notitle with lines\n");
 
         protein_print_atoms(self, gnuplot);
 
         fprintf(gnuplot, "e\n");
+
+        for (size_t i = 0; i < self->num_atoms; i++)
+                fprintf(gnuplot, "set label '%u' at %f, %f, %f\n", i,
+                        gsl_vector_get(self->atom[i], 0),
+                        gsl_vector_get(self->atom[i], 1),
+                        gsl_vector_get(self->atom[i], 2));
 
         fflush(gnuplot);
 }
@@ -205,9 +206,9 @@ bool protein_is_overlapping(const struct protein *self)
 
         for (size_t i = 0; i < self->num_atoms; i++)
                 for (size_t j = i+2; j < self->num_atoms; j++)
-                        if (fabs(protein_distance(self, i, j)) < bead_diameter) {
+                        if (protein_distance(self, i, j) < bead_diameter) {
                                 dprintf("overlap of %g between atoms %u and %u\n",
-                                        fabs(protein_distance(self, i, j)), i, j);
+                                        protein_distance(self, i, j), i, j);
                                 return true;
                         }
 
@@ -219,8 +220,6 @@ bool protein_is_overlapping(const struct protein *self)
 
 double protein_signum(const struct protein *self, size_t i, size_t j)
 {
-        double s = 1.0;
-
         if (abs((int) (i - j)) == 3) {
                 gsl_vector *v0 = self->atom[i];
                 gsl_vector *v1 = self->atom[i+1];
@@ -240,12 +239,11 @@ double protein_signum(const struct protein *self, size_t i, size_t j)
                 gsl_vector_sub(&v.vector, v1);
                 gsl_vector_sub(&w.vector, v2);
 
-                double d = triple_scalar_product(&u.vector, &v.vector, &w.vector);
-
-                s = d/fabs(d);
+                /* XXX Should we check that this is not zero? */
+                return signbit(triple_scalar_product(&u.vector, &v.vector, &w.vector)) != 0 ? -1.0 : 1.0;
+        } else {
+                return 1.0;
         }
-
-        return s;
 }
 
 double protein_distance(const struct protein *self,
@@ -265,49 +263,48 @@ double protein_distance(const struct protein *self,
 
 
 
-void protein_do_movement(struct protein *self, gsl_rng *rng,
-                         enum protein_movements m, size_t k, bool undo)
+bool protein_do_movement(struct protein *self, gsl_rng *rng,
+                         enum protein_movements m, size_t k)
 {
-        assert(self != NULL);
-        assert(rng != NULL);
+        bool status = false;
 
         switch (m) {
         case PROTEIN_SPIKE_MOVE:
-                protein_do_spike_move(self, rng, k, undo);
+                status = protein_do_spike_move(self, rng, k);
                 break;
         case PROTEIN_SHIFT_MOVE:
-                protein_do_shift_move(self, rng, k, undo);
+                status = protein_do_shift_move(self, rng, k);
                 break;
         case PROTEIN_PIVOT_MOVE:
-                protein_do_pivot_move(self, rng, k, undo);
+                status = protein_do_pivot_move(self, rng, k);
                 break;
         case PROTEIN_END_MOVE_FIRST:
-                protein_do_end_move_first(self, rng, undo);
+                status = protein_do_end_move_first(self, rng);
                 break;
         case PROTEIN_END_MOVE_LAST:
-                protein_do_end_move_last(self, rng, undo);
-                break;
-        default:
-                assert(0);
+                status = protein_do_end_move_last(self, rng);
                 break;
         }
+
+        return status;
 }
 
-void protein_do_natural_movement(struct protein *self, gsl_rng *rng, size_t k)
+bool protein_do_natural_movement(struct protein *self, gsl_rng *rng, size_t k)
 {
         dprintf("thread #%d is changing atom %u\n", omp_get_thread_num(), k);
 
-        if (k == 1)
-                protein_do_end_move_first(self, rng, true);
-        else if (1 < k && k < self->num_atoms-2)
-                protein_do_movement(self, rng, (enum protein_movements) gsl_rng_uniform_int(rng, 3), k, true);
-        else
-                protein_do_end_move_last(self, rng, true);
+        if (k == 1) {
+                return protein_do_end_move_first(self, rng);
+        } else if (1 < k && k < self->num_atoms-2) {
+                return protein_do_movement(self, rng, gsl_rng_uniform_int(rng, 2), k);
+        } else {
+                return protein_do_end_move_last(self, rng);
+        }
 }
 
 
 
-void protein_do_end_move_first(struct protein *self, gsl_rng *rng, bool undo)
+bool protein_do_end_move_first(struct protein *self, gsl_rng *rng)
 {
         dprintf("moving first atom.\n");
         dprintf("before: atom(0) == "); dprint_vector(self->atom[0]);
@@ -318,13 +315,16 @@ void protein_do_end_move_first(struct protein *self, gsl_rng *rng, bool undo)
         rotate(false, &RV.matrix, self->atom[1], self->atom[0]);
         dprintf("after: atom(0) == "); dprint_vector(self->atom[0]);
 
-        if (undo && protein_is_overlapping(self)) {
+        if (protein_is_overlapping(self)) {
                 rotate(true, &RV.matrix, self->atom[1], self->atom[0]);
                 dprintf("after undo: atom(0) == "); dprint_vector(self->atom[0]);
+                return false;
         }
+
+        return true;
 }
 
-void protein_do_end_move_last(struct protein *self, gsl_rng *rng, bool undo)
+bool protein_do_end_move_last(struct protein *self, gsl_rng *rng)
 {
         dprintf("moving last atom.\n");
         dprintf("before: atom(%d) == ", self->num_atoms-1);
@@ -339,22 +339,24 @@ void protein_do_end_move_last(struct protein *self, gsl_rng *rng, bool undo)
         dprintf("after: atom(%d) == ", self->num_atoms-1);
         dprint_vector(self->atom[self->num_atoms - 1]);
 
-        if (undo && protein_is_overlapping(self)) {
+        if (protein_is_overlapping(self)) {
                 rotate(true, &RV.matrix,
                        self->atom[self->num_atoms - 2],
                        self->atom[self->num_atoms - 1]);
                 dprintf("after undo: atom(%d) == ", self->num_atoms-1);
                 dprint_vector(self->atom[self->num_atoms-1]);
+                return false;
         }
+        return true;
 }
 
 
 
-void protein_do_shift_move(struct protein *self, gsl_rng *rng, size_t k, bool undo)
+bool protein_do_shift_move(struct protein *self, gsl_rng *rng, size_t k)
 {
         assert(k <= self->num_atoms - 3);
 
-        /* const size_t k = gsl_rng_uniform_int(rng, self->num_atoms - 3); */
+        bool status = true;
 
         dprintf("shifting move at atom %u\n", k);
         dprintf("before: atom(%u) == ", self->num_atoms-1); dprint_vector(self->atom[self->num_atoms-1]);
@@ -385,7 +387,7 @@ void protein_do_shift_move(struct protein *self, gsl_rng *rng, size_t k, bool un
         dprintf("after: atom(%u) == ", self->num_atoms-1); dprint_vector(self->atom[self->num_atoms-1]);
         dprintf("after: atom(%u) == ", k+1); dprint_vector(self->atom[k+1]);
 
-        if (undo && protein_is_overlapping(self)) {
+        if (protein_is_overlapping(self)) {
                 dprintf("undoing shift movement.\n");
 
                 for (size_t i = k+2; i < self->num_atoms; i++)
@@ -396,16 +398,22 @@ void protein_do_shift_move(struct protein *self, gsl_rng *rng, size_t k, bool un
                 gsl_vector_memcpy(self->atom[k+1], bak);
 
                 dprintf("after undo: atom(%u) == ", k+1); dprint_vector(self->atom[k+1]);
+
+                status = false;
         }
 
         gsl_vector_free(bak);
+
+        return status;
 }
 
 
 
-void protein_do_spike_move(struct protein *self, gsl_rng *rng, size_t k, bool undo)
+bool protein_do_spike_move(struct protein *self, gsl_rng *rng, size_t k)
 {
         assert(k <= self->num_atoms - 3);
+
+        bool status = true;
 
         const double theta = 2*M_PI*gsl_rng_uniform_pos(rng);
 
@@ -456,9 +464,10 @@ void protein_do_spike_move(struct protein *self, gsl_rng *rng, size_t k, bool un
         cross_product(&u0.vector, &u2.vector, &u1.vector);
         assert(gsl_fcmp(gsl_blas_dnrm2(&u1.vector), 0.0, 1e-3) != 0);
 
-        double R[3][3] = {{cos(theta), -sin(theta), 0.0},
-                          {sin(theta),  cos(theta), 0.0},
-                          {       0.0,         0.0, 1.0}};
+        /* XXX This code could be replaced by BLAS' DROT. */
+        double R[3][3] = {{cos(theta),  -sin(theta),    0.0},
+                          {sin(theta),   cos(theta),    0.0},
+                          {       0.0,          0.0,    1.0}};
         gsl_matrix_const_view RV = gsl_matrix_const_view_array((double *) R, 3, 3);
 
         gsl_matrix *A = gsl_matrix_alloc(3, 3);
@@ -475,20 +484,24 @@ void protein_do_spike_move(struct protein *self, gsl_rng *rng, size_t k, bool un
         dprintf("after: atom(%d) == ", k+1); dprint_vector(self->atom[k+1]);
 
         /* We are done if the conformation is correct. */
-        if (undo && protein_is_overlapping(self)) {
+        if (protein_is_overlapping(self)) {
                 gsl_vector_memcpy(self->atom[k+1], bak);
                 dprintf("after undo: atom(%d) == ", k+1); dprint_vector(self->atom[k+1]);
+
+                status = false;
         }
 
         gsl_vector_free(bak);
         gsl_vector_free(v); gsl_vector_free(a); gsl_vector_free(w);
         gsl_vector_free(t); gsl_vector_free(q); gsl_vector_free(z);
         gsl_matrix_free(G); gsl_matrix_free(A); gsl_matrix_free(B);
+
+        return status;
 }
 
 
 
-void protein_do_pivot_move(struct protein *self, gsl_rng *rng, size_t k, bool undo)
+bool protein_do_pivot_move(struct protein *self, gsl_rng *rng, size_t k)
 {
         const double theta = 2*M_PI*gsl_rng_uniform_pos(rng);
 
@@ -496,6 +509,8 @@ void protein_do_pivot_move(struct protein *self, gsl_rng *rng, size_t k, bool un
         dprintf("before: atom(%d) == ", k+1);
         dprint_vector(self->atom[k+1]);
 
+
+        /* XXX This code could be replaced by BLAS' DROT. */
         double RR[3][3] = {{cos(theta), -sin(theta), 0.0},
                            {sin(theta),  cos(theta), 0.0},
                            {       0.0,         0.0, 1.0}};
@@ -512,7 +527,7 @@ void protein_do_pivot_move(struct protein *self, gsl_rng *rng, size_t k, bool un
         dprintf("after: atom(%d) == ", k+1);
         dprint_vector(self->atom[k+1]);
 
-        if (undo && protein_is_overlapping(self)) {
+        if (protein_is_overlapping(self)) {
                 dprintf("undoing invalid conformation.\n");
                 for (size_t i = k+1; i < self->num_atoms; i++) {
                         gsl_vector_memcpy(y, self->atom[k]);
@@ -524,7 +539,11 @@ void protein_do_pivot_move(struct protein *self, gsl_rng *rng, size_t k, bool un
                 }
                 dprintf("after undo: atom(%d) == ", k+1);
                 dprint_vector(self->atom[k+1]);
+
+                return false;
         }
+
+        return true;
 }
 
 
@@ -535,4 +554,3 @@ void protein_scramble(struct protein *self, gsl_rng *rng)
                 for (size_t k = 0; k < self->num_atoms; k++)
                         protein_do_natural_movement(self, rng, k);
 }
-
