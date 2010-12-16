@@ -7,6 +7,7 @@ static bool plot_results = false;
 static void test_initialization_and_finalization(void);
 static void test_triple_scalar_product(void);
 static void test_movements(void);
+static void test_movements2(void);
 
 
 int main(int argc, char __attribute__((unused)) *argv[])
@@ -24,9 +25,10 @@ int main(int argc, char __attribute__((unused)) *argv[])
                 }
         }
 
-        test_initialization_and_finalization();
-        test_triple_scalar_product();
-        test_movements();
+        /* test_initialization_and_finalization(); */
+        /* test_triple_scalar_product(); */
+        /* test_movements(); */
+        test_movements2();
 
         exit(EXIT_SUCCESS);
 }
@@ -67,12 +69,12 @@ void test_initialization_and_finalization(void)
 
                 gnuplot = popen("gnuplot -persist", "w");
                 assert(gnuplot != NULL);
-                protein_plot(m, gnuplot, "1PGB");
+                protein_plot(m, gnuplot, true, "1PGB");
                 pclose(gnuplot);
 
                 gnuplot = popen("gnuplot -persist", "w");
                 assert(gnuplot != NULL);
-                protein_plot(g, gnuplot, "2GB1");
+                protein_plot(g, gnuplot, true, "2GB1");
                 pclose(gnuplot);
         }
 
@@ -97,7 +99,7 @@ void test_triple_scalar_product(void)
         printf("<u, v x w> = %g\n", tsp);
         assert(gsl_fcmp(tsp, -111.89, 1e-4) == 0);
 
-        printf("signum == %g\n", tsp/fabs(tsp));
+        printf("signum == %d\n", signbit(tsp));
 
         delete_protein(m);
 }
@@ -106,70 +108,89 @@ void test_triple_scalar_product(void)
 
 void test_movements(void)
 {
-        if (!plot_results)
-                return;
+        FILE *g = popen("gnuplot -persist", "w");
+        assert(g != NULL);
 
-        /* const double atoms[][3] = {{-3.8, 0, 0}, */
-        /*                            {0, 0, 1}, */
-        /*                            {3.8, 0, 0}, */
-        /*                            {2.0*3.8, 0, 0}, */
-        /*                            {3.0*3.8, 0, 0}, */
-        /*                            {4.0*3.8, 0, 0}, */
-        /*                            {5.0*3.8, 0, 0}}; */
-        /* const size_t num_atoms = 7; */
+        gsl_rng *r = gsl_rng_alloc(gsl_rng_default);
+        gsl_rng_env_setup();
+        gsl_rng_set(r, gsl_rng_default_seed);
 
+        double atom[][3] = {
+                {0.0, 0.0, -3.8}, {0.0, 0.0, 0.0},
+                {0.0, 3.8,  0.0}, {3.8, 3.8, 0.0}
+        };
+        size_t num_atoms = sizeof(atom)/sizeof(atom[0]);
+        struct protein *p = new_protein(num_atoms, (double *) atom);
+
+        protein_plot(p, g, true, "Test");
+        /* sleep(3); */
+
+        for (size_t i = 0; i < 100; i++) {
+                protein_do_pivot_move(p, r, 3);
+                protein_plot(p, g, true, "Test");
+        }
+
+        delete_protein(p);
+        gsl_rng_free(r);
+        pclose(g);
+}
+
+void test_movements2(void)
+{
         struct protein *n;
-        struct protein *(*constructor)(void) = new_protein_1pgb;
+        struct protein *(*constructor)(void) = new_protein_2gb1;
 
         FILE *g = popen("gnuplot -persist", "w");
         assert(g != NULL);
 
         gsl_rng *r = gsl_rng_alloc(gsl_rng_default);
         gsl_rng_env_setup();
-        gsl_rng_set(r, (unsigned) time(NULL));
+        gsl_rng_set(r, gsl_rng_default_seed);
 
         n = constructor();
         for (size_t i = 0; i < 100; i++) {
-                protein_plot(n, g, "End chain movement (1)");
                 protein_do_movement(n, r, PROTEIN_END_MOVE_FIRST, 0);
+                if (plot_results)
+                        protein_plot(n, g, false, "End chain movement (1)");
         }
         delete_protein(n);
-        sleep(3);
 
         n = constructor();
         for (size_t i = 0; i < 100; i++) {
                 protein_do_movement(n, r, PROTEIN_END_MOVE_LAST, 0);
-                protein_plot(n, g, "End chain movement (2)");
+                if (plot_results)
+                        protein_plot(n, g, false, "End chain movement (2)");
         }
         delete_protein(n);
-        sleep(3);
 
         n = constructor();
-        for (size_t i = 0; i < 250; i++) {
-                protein_do_movement(n, r, PROTEIN_SHIFT_MOVE, 1);
-                protein_plot(n, g, "Shifting movement");
+        for (size_t i = 0; i < 100; i++) {
+                protein_do_movement(n, r, PROTEIN_SHIFT_MOVE, 30);
+                if (plot_results)
+                        protein_plot(n, g, false, "Shifting movement");
         }
         delete_protein(n);
-        sleep(3);
 
         n = constructor();
         for (size_t i = 0; i < 250; i++) {
                 protein_do_movement(n, r, PROTEIN_SPIKE_MOVE, 1);
-                protein_plot(n, g, "Spike movement");
+                if (plot_results)
+                        protein_plot(n, g, false, "Spike movement");
         }
         delete_protein(n);
-        sleep(3);
 
         n = constructor();
         for (size_t i = 0; i < 250; i++) {
                 protein_do_movement(n, r, PROTEIN_PIVOT_MOVE, 52);
-                protein_plot(n, g, "Pivoting movement");
+                if (plot_results)
+                        protein_plot(n, g, false, "Pivoting movement");
         }
         delete_protein(n);
 
         n = constructor();
         protein_scramble(n, r);
-        protein_plot(n, g, "Scrambled molecule");
+        if (plot_results)
+                protein_plot(n, g, true, "Scrambled molecule");
         delete_protein(n);
 
         pclose(g);

@@ -36,8 +36,9 @@ void test_initialization_and_finalization(void)
         struct protein *p = new_protein_2gb1();
         assert(p != NULL);
 
-        struct contact_map *c1 = new_contact_map(p, 10);
-        struct contact_map *c2 = new_contact_map(p, 7.5);
+        double d1 = 10.0, d2 = 7.5;
+        struct contact_map *c1 = new_contact_map(p, d1);
+        struct contact_map *c2 = new_contact_map(p, d2);
         assert(c1 != NULL && c2 != NULL);
         
         if (plot_results) {
@@ -47,9 +48,15 @@ void test_initialization_and_finalization(void)
                 FILE *g = popen("gnuplot --persist", "w");
                 assert(g != NULL);
 
-                contact_map_plot(c1, g, "");
+                contact_map_plot(c1, g,
+                                 "2GB1 (d_max: %2.3f, # of native contacts: %u)",
+                                 d1, contact_map_get_num_contacts(c1));
+
                 getchar();
-                contact_map_plot(c2, g, "");
+
+                contact_map_plot(c2, g,
+                                 "2GB1 (d_max: %2.3f, # of native contacts: %u)",
+                                 d2, contact_map_get_num_contacts(c2));
 
                 pclose(g);
         }
@@ -76,8 +83,8 @@ void test_potential_energy(void)
         printf("potential(1pgb) = %g\n", p_1pgb);
         printf("potential(2gb1) = %g\n", p_2gb1);
 
-        assert(gsl_fcmp(p_1pgb, -460.0, 1e-15) == 0);
-        assert(gsl_fcmp(p_2gb1, -460.0, 1e-15) == 0);
+        assert(gsl_fcmp(p_1pgb, -366.0, 1e-15) == 0);
+        assert(gsl_fcmp(p_2gb1, -364.0, 1e-15) == 0);
 
         delete_contact_map(c1);
         delete_contact_map(c2);

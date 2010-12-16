@@ -26,9 +26,9 @@ int main(void)
         };
         struct replicas *r = new_replicas(p, &options);
 
-        size_t k = 1;
         replicas_thermalize(r, 1);
-        while (replicas_have_not_converged(r)) {
+        /* while (replicas_have_not_converged(r)) { */
+        for (size_t k = 1; k < 100; k++) {
                 replicas_next_iteration(r);
                 show_progress(r, k);
                 ++k;
@@ -60,8 +60,7 @@ void show_progress(struct replicas *r, size_t k)
                 /*              "Replica %u, iteration %u (%g).  Acceptance: %2.03g", j, */
                 /*              k, s->energy, simulation_get_acceptance_ratio(s)); */
 
-                printf("progress for replica %u: %g/%g\n",
-                       j, s->energy, r->orig_energy);
+                printf("progress for replica %u: %g\n", j, s->energy);
         }
         fflush(stdout);
 }
