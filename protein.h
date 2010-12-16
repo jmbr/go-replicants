@@ -21,16 +21,17 @@ extern void delete_protein(struct protein *self);
 extern struct protein *protein_dup(const struct protein *self);
 
 /* Input/Output functions. */
-extern struct protein *protein_read_xyz(FILE *stream);
-extern int protein_write_xyz(const struct protein *self, FILE *stream);
 extern struct protein *protein_read_xyz_file(const char *name);
+extern struct protein *protein_read_xyz(FILE *stream);
+extern struct protein *protein_read_latest_xyz(FILE *stream);
 extern int protein_write_xyz_file(const struct protein *self, const char *name);
+extern int protein_write_xyz(const struct protein *self, FILE *stream);
 
 extern int protein_print_atoms(const struct protein *self, FILE *stream);
 
 extern void protein_plot(const struct protein *self, FILE *gnuplot,
-                         const char *title_format, ...)
-        __attribute__ ((format (printf, 3, 4)));
+                         bool draw_labels, const char *title_format, ...)
+        __attribute__ ((format (printf, 4, 5)));
 
 /* Geometry functions. */
 extern double protein_signum(const struct protein *self, size_t i, size_t j);

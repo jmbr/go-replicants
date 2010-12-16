@@ -12,12 +12,19 @@ enum protein_movements {
 };
 
 
-extern bool protein_is_overlapping(const struct protein *self);
-#define protein_is_not_overlapping(p)   !protein_is_overlapping(p)
+extern bool protein_is_overlapping(const struct protein *self, size_t start, size_t end);
+#define protein_is_not_overlapping(p, s, e)   !protein_is_overlapping(p, s, e)
 
 extern bool protein_do_movement(struct protein *self, gsl_rng *rng,
                                 enum protein_movements m, size_t k);
+
 extern bool protein_do_natural_movement(struct protein *self, gsl_rng *rng, size_t k);
+
+extern bool protein_do_shift_move(struct protein *self, gsl_rng *rng, size_t k);
+extern bool protein_do_spike_move(struct protein *self, gsl_rng *rng, size_t k);
+extern bool protein_do_pivot_move(struct protein *self, gsl_rng *rng, size_t k);
+extern bool protein_do_end_move_first(struct protein *self, gsl_rng *rng);
+extern bool protein_do_end_move_last(struct protein *self, gsl_rng *rng);
 
 extern void protein_scramble(struct protein *self, gsl_rng *rng);
 
