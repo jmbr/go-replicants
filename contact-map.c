@@ -12,8 +12,7 @@ struct contact_map {
 static void contact_map_compute(struct contact_map *self, const struct protein *protein);
 static void print_contact_map(FILE *stream, const struct contact_map *self);
 
-
-        
+
 struct contact_map *new_contact_map(const struct protein *protein, double d_max)
 {
         if (protein == NULL || d_max <= 0.0)
@@ -48,6 +47,8 @@ void delete_contact_map(struct contact_map *self)
                 free(self->distance);
         free(self);
 }
+
+
 
 void contact_map_compute(struct contact_map *self,
                          const struct protein *protein)
@@ -100,7 +101,7 @@ double contact_map_get_d_max(const struct contact_map *self)
         return self->d_max;
 }
 
-double contact_map_get_distance(const struct contact_map *self, 
+double contact_map_get_distance(const struct contact_map *self,
                                 size_t i, size_t j)
 {
         assert(self != NULL);
@@ -121,7 +122,7 @@ double contact_map_get_distance(const struct contact_map *self,
 
 
 void contact_map_plot(const struct contact_map *self, FILE *gnuplot,
-                     const char *title_format, ...)
+                      const char *title_format, ...)
 {
         assert(self != NULL);
         assert(gnuplot != NULL);
@@ -136,9 +137,14 @@ void contact_map_plot(const struct contact_map *self, FILE *gnuplot,
         fprintf(gnuplot, "set terminal wxt noraise\n"
                          "set palette gray\n"
                          "unset colorbox\n"
-                         "plot '-' matrix notitle with image\n");
+                         "set tics out nooffset\n"
+                         "set xtics 0,5,%u\n"
+                         "set ytics 0,5,%u\n"
+                         "plot '-' matrix notitle with image\n",
+                self->num_atoms, self->num_atoms);
         print_contact_map(gnuplot, self);
         fprintf(gnuplot, "e\ne\n");
+
         fflush(gnuplot);
 }
 
@@ -149,9 +155,9 @@ void print_contact_map(FILE *stream, const struct contact_map *self)
         for (size_t i = 0; i < N; i++) {
                 for (size_t j = 0; j < N; j++) {
                         double d = contact_map_get_distance(self, i, j);
-                        /* if (abs(i - j) < 2) */
-                        /*         fputs("0 ", stream); */
-                        /* else */
+                        if (abs((int) i - (int) j) < 2)
+                                fputs("0 ", stream);
+                        else
                                 fputs(d != 0.0 ? "0 " : "1 ", stream);
                 }
                 fputs("\n", stream);
@@ -164,7 +170,7 @@ int contact_map_diff(const struct contact_map *m1, const struct contact_map *m2)
                 return -1;
 
         const size_t N = m1->num_atoms;
-        
+
         for (size_t i = 0; i < N; i++) {
                 for (size_t j = i+2; j < N; j++) {
                         double d1 = contact_map_get_distance(m1, i, j);

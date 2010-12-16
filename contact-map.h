@@ -20,6 +20,7 @@ extern void contact_map_plot(const struct contact_map *self, FILE *gnuplot,
                              const char *title_format, ...)
         __attribute__ ((format (printf, 3, 4)));
 
-extern int contact_map_diff(const struct contact_map *c1, const struct contact_map *c2);
+extern int contact_map_diff(const struct contact_map *c1,
+                            const struct contact_map *c2);
 
 #endif // !CONTACT_MAP_H
