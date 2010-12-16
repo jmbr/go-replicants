@@ -1,11 +1,13 @@
 #include "molecular-simulator.h"
 
 
-static void print_usage(const char *prog_name);
+static void print_usage(void);
 
 
 int main(int argc, char *argv[])
 {
+        set_prog_name("eval-potential");
+
         char *reference = NULL;
         double d_max = 0.0, a = 0.0;
 
@@ -33,13 +35,13 @@ int main(int argc, char *argv[])
                         a = atof(optarg);
                         break;
                 case 'h':
-                        print_usage(argv[0]);
+                        print_usage();
                         exit(EXIT_SUCCESS);
                 }
         }
 
         if (reference == NULL || d_max <= 0.0 || a <= 0.0 || optind == argc) {
-                print_usage(argv[0]);
+                print_usage();
                 exit(EXIT_FAILURE);
         }
         
@@ -47,23 +49,20 @@ int main(int argc, char *argv[])
         struct contact_map *m1, *m2;
 
         p1 = protein_read_xyz_file(reference);
-        if (p1 == NULL) {
-                fprintf(stderr, "Unable to open `%s'.\n", reference);
-                exit(EXIT_FAILURE);
-        }
+        if (p1 == NULL)
+                die_printf("Unable to open `%s'.\n", reference);
 
-        p2 = protein_read_xyz_file(argv[optind]);
-        if (p2 == NULL) {
-                fprintf(stderr, "Unable to open `%s'.\n", reference);
-                exit(EXIT_FAILURE);
-        }
+
+        FILE *f = fopen(argv[optind], "r");
+        if (f == NULL)
+                die_printf("Unable to open `%s'.\n", argv[optind]);
+        p2 = protein_read_latest_xyz(f);
+        fclose(f);
 
         m1 = new_contact_map(p1, d_max);
         m2 = new_contact_map(p2, d_max);
-        if (m1 == NULL || m2 == NULL) {
-                fprintf(stderr, "Unable to compute contact maps.\n");
-                exit(EXIT_FAILURE);
-        }
+        if (m1 == NULL || m2 == NULL)
+                die("Unable to compute contact maps.");
 
         contact_map_diff(m1, m2);
 
@@ -72,7 +71,8 @@ int main(int argc, char *argv[])
         exit(EXIT_SUCCESS);
 }
 
-void print_usage(const char *prog_name)
+void print_usage(void)
 {
-        printf("Usage: %s --reference FILE --dmax VALUE --a VALUE FILE\n", prog_name);
+        printf("Usage: %s --reference FILE --dmax VALUE "
+               "--a VALUE FILE\n", get_prog_name());
 }

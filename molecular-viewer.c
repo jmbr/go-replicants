@@ -3,6 +3,8 @@
 
 int main(int argc, char *argv[])
 {
+        set_prog_name("molecular-viewer");
+
         if (argc < 2) {
                 fprintf(stderr, "Usage: %s [-d VALUE] FILE\n", argv[0]);
                 exit(EXIT_FAILURE);
@@ -13,28 +15,24 @@ int main(int argc, char *argv[])
                 d_max = atof(argv[2]);
         
         struct protein *p = protein_read_xyz_file(argv[argc-1]);
-        if (p == NULL) {
-                fprintf(stderr, "Unable to read `%s'.\n", argv[argc-1]);
-                exit(EXIT_FAILURE);
-        }
+        if (p == NULL)
+                die_printf("Unable to read `%s'.\n", argv[argc-1]);
 
         FILE *g1 = popen(GNUPLOT_EXECUTABLE " -persist", "w");
-        if (g1 == NULL) {
-                fprintf(stderr, "Unable to run Gnuplot.\n");
-                exit(EXIT_FAILURE);
-        }
+        if (g1 == NULL)
+                die_printf("Unable to run Gnuplot binary `%s'.\n",
+                           GNUPLOT_EXECUTABLE);
 
-        protein_plot(p, g1, "%s", argv[argc-1]);
+        protein_plot(p, g1, true, "%s", argv[argc-1]);
 
         pclose(g1);
 
         if (d_max > 0.0) {
                 struct contact_map *m = new_contact_map(p, d_max);
                 FILE *g2 = popen(GNUPLOT_EXECUTABLE " -persist", "w");
-                if (g2 == NULL) {
-                        fprintf(stderr, "Unable to run Gnuplot.\n");
-                        exit(EXIT_FAILURE);
-                }
+                if (g2 == NULL)
+                        die_printf("Unable to run Gnuplot binary `%s'.\n",
+                                   GNUPLOT_EXECUTABLE);
 
                 contact_map_plot(m, g2,
                                  "%s (native contacts: %u, pot. energy: %f)",

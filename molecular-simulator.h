@@ -10,6 +10,7 @@
 #include <getopt.h>
 #include <unistd.h>
 #include <time.h>
+#include <errno.h>
 #include <sys/time.h>
 
 #include <gsl/gsl_const.h>
