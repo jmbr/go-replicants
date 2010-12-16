@@ -33,4 +33,11 @@ do {                                            \
 # define dprintf(...)
 #endif // !NDEBUG
 
+extern void set_prog_name(const char *name);
+extern const char *get_prog_name(void);
+
+extern void die(const char *message) __attribute__((noreturn));
+extern void die_errno(const char *func_name) __attribute__((noreturn));
+extern void die_printf(const char *format, ...) __attribute__((format(printf, 1, 2), noreturn));
+
 #endif // !UTILS_H
