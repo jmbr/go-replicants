@@ -1,51 +1,44 @@
 #include "molecular-simulator.h"
 
 
+const size_t save_energy_step = 1000;
+const size_t save_conformation_step = 5000;
+
+static bool options_are_invalid(const struct simulation_options *options);
 static void replicas_exchange(struct replicas *self, size_t k);
+static void save_energy(const struct replicas *self);
+static void save_conformation(const struct replicas *self);
 
-
+/* XXX Replicas should be responsible for allocating and freeing the
+ * protein structure.  */
 struct replicas *new_replicas(struct protein *protein,
                               const struct simulation_options *options)
 {
-        if (protein == NULL
-            || options == NULL
-            || options->rng == NULL
-            || options->num_replicas == 0
-            || options->d_max <= 0.0 || options->a <= 0.0)
-        {
+        if (protein == NULL || options_are_invalid(options))
                 return NULL;
-        }
+
+        const size_t total_size = sizeof(struct replicas)
+                + options->num_replicas*sizeof(struct simulation *);
         
-        struct replicas *r;
-        r = calloc(1, sizeof(struct replicas)
-                      + options->num_replicas*sizeof(struct simulation *));
+        struct replicas *r = calloc(1, total_size);
         if (r == NULL)
                 return NULL;
 
-        r->protein = protein;
-
         r->rng = options->rng;
-
-        /* Initialize native contact map. */
+        r->protein = protein;
         r->native_map = new_contact_map(protein, options->d_max);
         if (r->native_map == NULL) {
                 free(r);
                 return NULL;
         }
-
         r->a = options->a;
-
-        r->orig_energy = potential(r->protein, r->native_map, r->a);
-
-        r->exchanges = calloc(options->num_replicas, sizeof(size_t));
-        r->total = calloc(options->num_replicas, sizeof(size_t));
+        r->num_replicas = options->num_replicas;
+        r->exchanges = calloc(r->num_replicas, sizeof(size_t));
+        r->total = calloc(r->num_replicas, sizeof(size_t));
         if (r->exchanges == NULL || r->total == NULL) {
                 delete_replicas(r);
                 return NULL;
         }
-
-        r->num_replicas = options->num_replicas;
-
         for (size_t k = 0; k < r->num_replicas; k++) {
                 r->replica[k] = new_simulation(r->native_map, r->a,
                                                options->temperatures[k], r->rng);
@@ -58,6 +51,15 @@ struct replicas *new_replicas(struct protein *protein,
         return r;
 }
 
+bool options_are_invalid(const struct simulation_options *options)
+{
+        return (options == NULL
+                || options->rng == NULL || options->num_replicas == 0
+                || options->d_max <= 0.0 || options->a <= 0.0);
+}
+
+
+
 void delete_replicas(struct replicas *self)
 {
         for (size_t k = 0; k < self->num_replicas; k++)
@@ -69,51 +71,75 @@ void delete_replicas(struct replicas *self)
                 free(self->total);
         if (self->native_map)
                 delete_contact_map(self->native_map);
+        /* XXX: If new_replica fails, protein will be deallocated. */
         if (self->protein)
                 delete_protein(self->protein);
         free(self);
 }
 
-
+void save_energy(const struct replicas *self)
+{
+        for (size_t k = 0; k < self->num_replicas; k++) {
+                const struct simulation *s = self->replica[k];
+                fprintf(s->U, "%f\n", s->energy);
+                fflush(s->U);
+        }
+}
+
+void save_conformation(const struct replicas *self)
+{
+        for (size_t k = 0; k < self->num_replicas; k++) {
+                const struct simulation *s = self->replica[k];
+                protein_write_xyz(s->protein, s->X);
+        }
+}
 
 void replicas_first_iteration(struct replicas *self)
 {
         protein_scramble(self->protein, self->rng);
         double energy = potential(self->protein, self->native_map, self->a);
 
-        protein_write_xyz_file(self->protein, "initial-conformation.xyz");
-
         size_t k;
-        #pragma omp parallel for private(k)
+#pragma omp parallel for private(k)
         for (k = 0; k < self->num_replicas; k++)
                 simulation_first_iteration(self->replica[k],
                                            self->protein, energy);
+
+        save_energy(self);
+        save_conformation(self);
 }
 
-void replicas_resume(struct replicas *self, const struct protein *config[])
+void replicas_resume(struct replicas *self, const struct protein *conf[])
 {
+        /* Initialize every replica with the protein structure and energy. */
         size_t k;
-        #pragma omp parallel for private(k)
+#pragma omp parallel for private(k)
         for (k = 0; k < self->num_replicas; k++) {
-                const struct protein *p = config[k];
+                const struct protein *p = conf[k];
                 const double U = potential(p, self->native_map, self->a);
                 simulation_first_iteration(self->replica[k], p, U);
         }
 }
+
+
 
 void replicas_thermalize(struct replicas *self, size_t num_iters)
 {
         const size_t iters_per_cycle = self->protein->num_atoms;
 
         dprintf("performing %u thermalization steps.\n", num_iters);
-
-        replicas_first_iteration(self);
-
-        for (size_t s = 0; s < (num_iters-1)*iters_per_cycle; s++) {
+        
+        for (size_t s = 0; s < num_iters; s++) {
                 size_t k;
-                #pragma omp parallel for private(k)
+#pragma omp parallel for private(k)
                 for (k = 0; k < self->num_replicas; k++)
-                        simulation_next_iteration(self->replica[k]);
+                        for (size_t c = 0; c < iters_per_cycle; c++)
+                                simulation_next_iteration(self->replica[k]);
+
+                if (s > 0 && s % save_energy_step == 0)
+                        save_energy(self);
+                if (s > 0 && s % save_conformation_step == 0)
+                        save_conformation(self);
         }
 
         dprintf("done with the thermalization steps.\n");
@@ -124,24 +150,37 @@ void replicas_next_iteration(struct replicas *self)
         size_t k;
 
         const size_t num_iters = 5000;
-        const size_t iters_per_cycle = self->protein->num_atoms;
 
-        printf("attempting to exchange replicas.\n");
-        for (k = gsl_rng_uniform_int(self->rng, 2);
-             k <= self->num_replicas - 2;
-             k += 2)
-        {
-                replicas_exchange(self, k);
+        if (self->num_replicas > 1) {
+                printf("attempting to exchange replicas.\n");
+                for (k = gsl_rng_uniform_int(self->rng, 2);
+                     k <= self->num_replicas - 2;
+                     k += 2)
+                {
+                        replicas_exchange(self, k);
+                }
+                printf("done with replica exchange.\n");
         }
 
-        for (size_t s = 0; s < num_iters*iters_per_cycle; s++)
-                #pragma omp parallel for private(k)
+        for (size_t s = 0; s < num_iters; s++) {
+#pragma omp parallel for private(k)
                 for (k = 0; k < self->num_replicas; k++)
-                        simulation_next_iteration(self->replica[k]);
+                        for (size_t c = 0; c < self->protein->num_atoms; c++)
+                                simulation_next_iteration(self->replica[k]);
+
+                if (s % save_energy_step == 0)
+                        save_energy(self);
+                if (s % save_conformation_step == 0)
+                        save_conformation(self);
+        }
 }
+
+
 
 void replicas_exchange(struct replicas *self, size_t k)
 {
+        assert(self->num_replicas >= 2);
+
         struct simulation *s1 = self->replica[k];
         struct simulation *s2 = self->replica[k+1];
         const double U1 = s1->energy;
@@ -165,25 +204,6 @@ void replicas_exchange(struct replicas *self, size_t k)
         ++self->total[k];
 
         fflush(stdout);
-}
-
-
-
-static inline bool simulation_has_converged(const struct simulation *s,
-                                            double orig_energy)
-{
-        return gsl_fcmp(orig_energy, s->energy, 1e-3) == 0;
-}
-
-bool replicas_have_converged(const struct replicas *self)
-{
-        bool status = false;
-
-        for (size_t s = 0; s < self->num_replicas; s++)
-                status |= simulation_has_converged(self->replica[s],
-                                                   self->orig_energy);
-
-        return status;
 }
 
 

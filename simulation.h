@@ -3,22 +3,20 @@
 
 struct contact_map;
 
+/*** Individual replica.  This structure characterizes the simulation
+ * process to be performed by an individual replica. */
 struct simulation {
-        struct protein *protein;
-        size_t next_atom;
-        const struct contact_map *native_map;
-
-        double a;
-
-        double energy;
-
-        double temperature;
-
-        gsl_rng *rng;
-
-        size_t accepted, total; /* Number of accepted moves and total number of moves. */
-
-        FILE *U, *X;            /* Log files. */
+        struct protein *protein;                /**< Protein to be simulated. */
+        size_t next_atom;			/**< Index of the next atom to be changed by a movement. */
+        const struct contact_map *native_map;   /**< Native contacts. */
+        double a;       		        /**< Tolerance parameter for the potential. */
+        double energy;				/**< Current potential energy. */
+        double temperature;                     /**< Temperature. */
+        gsl_rng *rng;                           /**< Random number generator. */
+        size_t accepted;                        /**< Number of accepted movements. */
+        size_t total;                           /**< Number of attempted movements. */
+        FILE *U;                                /**< Storage file containing energy values. */
+        FILE *X;                                /**< Storage file containing spatial conformations. */
 };
 
 

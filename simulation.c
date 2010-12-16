@@ -1,8 +1,6 @@
 #include "molecular-simulator.h"
 
 
-const size_t simulation_save_step = 10000;
-
 const char U_file_template[] = "U--t-%02.05f--dmax-%02.05f--a-%02.05f.dat";
 const char X_file_template[] = "X--t-%02.05f--dmax-%02.05f--a-%02.05f.xyz";
 
@@ -20,7 +18,7 @@ struct simulation *new_simulation(const struct contact_map *native_map,
         if (s == NULL)
                 return NULL;
 
-        s->next_atom = 1;
+        s->next_atom = 0;
         s->native_map = native_map;
 
         s->a = a;
@@ -50,11 +48,13 @@ int open_log_files(struct simulation *s)
         sprintf(name2, U_file_template, s->temperature,
                 contact_map_get_d_max(s->native_map), s->a);
 
-        s->U = fopen(name2, "w");
-        s->X = fopen(name1, "w");
+        s->X = fopen(name1, "a");
+        s->U = fopen(name2, "a");
 
-        return (s->U != NULL && s->X != NULL) ? 0 : -1;
+        return (s->X != NULL && s->U != NULL) ? 0 : -1;
 }
+
+
 
 void delete_simulation(struct simulation *self)
 {
@@ -70,7 +70,6 @@ void delete_simulation(struct simulation *self)
         free(self);
 }
 
-
 
 double simulation_get_acceptance_ratio(const struct simulation *self)
 {
@@ -79,15 +78,6 @@ double simulation_get_acceptance_ratio(const struct simulation *self)
         return (double) self->accepted/(double) self->total;
 }
 
-
-
-static void simulation_save_state(const struct simulation *self)
-{
-        fprintf(self->U, "%f\n", self->energy);
-        fflush(self->U);
-
-        protein_write_xyz(self->protein, self->X);
-}
 
 void simulation_first_iteration(struct simulation *self,
                                 const struct protein *protein, double energy)
@@ -98,8 +88,6 @@ void simulation_first_iteration(struct simulation *self,
 
         self->protein = protein_dup(protein);
         self->energy = energy;
-
-        simulation_save_state(self);
 }
 
 static inline double
@@ -108,14 +96,13 @@ compute_potential_energy(const struct protein *x, const struct simulation *s)
         return potential(x, s->native_map, s->a);
 }
 
+
+
 void simulation_next_iteration(struct simulation *self)
 {
         assert(self != NULL);
 
         ++self->total;
-
-        if (self->total % simulation_save_step == 0)
-                simulation_save_state(self);
 
         struct protein *current = self->protein;
         struct protein *candidate = protein_dup(current);
@@ -146,8 +133,6 @@ void simulation_next_iteration(struct simulation *self)
                 delete_protein(candidate);
         }
 }
-
-
 
 void simulation_print_info(const struct simulation *self, FILE *stream)
 {

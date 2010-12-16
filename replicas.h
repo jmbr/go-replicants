@@ -3,32 +3,20 @@
 
 struct contact_map;
 
+/** Replica data structure.  This provides context for the replica
+ * exchange simulation. */
 struct replicas {
-        gsl_rng *rng;
-
-        struct protein *protein;
-
-        /** Tolerance for distances between amino acids.  This is used
-         * for the potential energy calculation and its value should
-         * be less than 1 Angstrom. */
-        double a;
-
-        struct contact_map *native_map;
-        double orig_energy;
-
-        /** Probability of exchanging replicas. */
-        double alpha0;
-
-        /** Number of replicas. */
-        size_t num_replicas;
-
-        /** Number of exchanges per pair of temperatures and number of
-         * attempted exchanges per pair of temperature. */
-        size_t *exchanges, *total;
-
-        struct simulation *replica[];
+        gsl_rng *rng;		        /**< Random number generator. */
+        struct protein *protein;	/**< Protein to be simulated. */
+        struct contact_map *native_map; /**< Native contacts. */
+        double a;                       /**< Tolerance for distances between amino acids. */
+        size_t num_replicas;            /**< Number of replicas. */
+        size_t *exchanges;              /**< Number of exchanges per pair of replicas. */
+        size_t *total;                  /**< Number of attempted exchanges per pair of replicas. */
+        struct simulation *replica[];   /**< Array of replicas. */
 };
 
+/** Auxiliary options for new_replicas. */
 struct simulation_options {
         gsl_rng *rng;
         double d_max, a;
@@ -47,9 +35,6 @@ extern void replicas_resume(struct replicas *self,
                             const struct protein *config[]);
 extern void replicas_first_iteration(struct replicas *self);
 extern void replicas_next_iteration(struct replicas *self);
-
-extern bool replicas_have_converged(const struct replicas *self);
-#define replicas_have_not_converged(s)  (!replicas_have_converged(s))
 
 extern size_t replicas_total_exchanges(const struct replicas *self);
 extern void replicas_get_exchange_ratios(const struct replicas *self,
