@@ -1,0 +1,69 @@
+#+TITLE: Go Replicants! A molecular simulator of Go-type potentials for proteins.
+#+AUTHOR: Juan M. Bello Rivas
+#+EMAIL: jmberi@mat.ucm.es
+#+DATE: <2011-05-02 Mon>
+#+KEYWORDS: molecular simulator go potentials proteins
+#+LANGUAGE:  en
+#+OPTIONS:   H:3 num:t toc:t \n:nil @:t ::t |:t ^:t -:t f:t *:t <:t
+
+* Overview
+
+"Go Replicants!" is a molecular simulator for proteins. It uses a
+replica exchange Monte Carlo strategy to explore the energy surfaces
+of Go-type potentials of proteins following the methodology explained
+in [[http://link.aip.org/link/doi/10.1063/1.2064888][Thermodynamics of Go-type models for protein folding. Prieto L., de
+Sancho D., Rey A. The Journal of chemical physics. (2005) October;
+123:154903]].
+
+This software is currently in alpha stage. Use at your own risk.
+
+* Prerequisites
+
+You need a recent version (1.14 or above) of the [[http://www.gnu.org/software/gsl/][GNU Scientific Library]]. It is recommended
+to also have [[http://math-atlas.sourceforge.net/][ATLAS]] and [[http://www.gnuplot.info][Gnuplot]] installed.
+
+* License
+
+This software is released under the MIT X11 license. See the
+accompanying LICENSE file for details.
+
+* Usage
+
+** Building from source code
+
+1. Download the package from [[http://curio.mat.ucm.es/~jmbr/go-replicants/go-replicants-latest.tar.gz]]. 
+2. Extract the source code with =tar xvzf go-replicants-latest.tar.gz=
+3. =cd go-replicants && mkdir build && cd build=
+4. =cmake -L ../devel && make=
+
+This builds the binaries =molecular-viewer= and =molecular-simulator=.
+
+** Running a simulation
+
+You need the structural data of a protein in XYZ format for
+=molecular-simulator= to operate. Structural data downloaded in PDB
+format from the [[http://www.pdb.org][Protein Data Bank]] can be converted to XYZ format using
+a conversion script included in the =scripts= directory. To do the
+conversion write:
+#+BEGIN_SRC bash
+../scripts/pdb2xyz PROTEIN.pdb > PROTEIN.xyz
+#+END_SRC
+
+Once the structural data is in the right format one can run a simulation by executing
+#+BEGIN_SRC bash
+./molecular-simulator -d D -a A -t T1 -t T2 ... -t TN PROTEIN.xyz
+#+END_SRC
+In the previous command D and A stand respectively for the dmax and a
+parameters of the potential energy function and T1, ..., TN are the
+temperatures to be simulated (in dimensionless units).  This produces
+two kinds of files with extensions DAT and XYZ. The former contain
+values of the potential energy function as the simulation proceeds and
+the latter contain the corresponding spatial conformations of the
+protein.
+
+* Bug reports
+
+Please send bug reports and/or patches to the [[mailto:jmberi@mat.ucm.es][author's email address]].
+
+#+OPTIONS: toc:2
+#+STARTUP: showall
