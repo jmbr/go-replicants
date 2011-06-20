@@ -27,13 +27,11 @@ double triple_scalar_product(const gsl_vector *u,
                              const gsl_vector *v,
                              const gsl_vector *w)
 {
-        double space[3];
+        double space[3], result;
         gsl_block b = block_init(3, space);
         gsl_vector vxw = vector_init(b, 0, 3, 1);
-        /* declare_stack_allocated_vector(vxw, 3); */
-        cross_product(v, w, &vxw);
 
-        double result;
+        cross_product(v, w, &vxw);
         gsl_blas_ddot(u, &vxw, &result);
 
         return result;
