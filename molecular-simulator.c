@@ -21,20 +21,23 @@ int main(int argc, char *argv[])
         };
 
         while (true) {
-                struct option cmd_options[] = {
+                struct option long_options[] = {
                         {"resume", no_argument, (int *) &resume, true},
                         {"temperature", required_argument, NULL, 't'},
                         {"dmax", required_argument, NULL, 'd'},
                         {"a", required_argument, NULL, 'a'},
                         {"setup-only", no_argument, (int *) &setup_only, true},
+
                         {"simulate-only", no_argument, (int *) &simulate_only, true},
                         {"help", no_argument, NULL, 'h'},
                         {0, 0, 0, 0}
                 };
 
-                int c = getopt_long_only(argc, argv, "", cmd_options, 0);
+                int c = getopt_long_only(argc, argv, "", long_options, NULL);
+
                 if (c == -1)
                         break;
+
                 switch (c) {
                 case 't':
                         temperatures[opts.num_replicas++] = atof(optarg);
@@ -126,13 +129,13 @@ void show_progress(const struct replicas *r, size_t k)
         if (k != 1 && k % 100 != 0)
                 return;
 
-        printf("total number of exchanges: %u\n", replicas_total_exchanges(r));
+        printf("total number of exchanges: %zu\n", replicas_total_exchanges(r));
         replicas_print_info(r, stdout);
 
         for (size_t j = 0; j < r->num_replicas; j++) {
                 struct simulation *s = r->replica[j];
                 simulation_print_info(s, stdout);
-                printf("replica %u: %g\n", j, s->energy);
+                printf("replica %zu: %g\n", j, s->energy);
         }
 
         fflush(stdout);

@@ -23,7 +23,6 @@
 #include <gsl/gsl_blas.h>
 
 #include "utils.h"
-#include "linspace.h"
 #include "geometry.h"
 #include "contact-map.h"
 #include "protein.h"
