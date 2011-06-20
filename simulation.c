@@ -27,7 +27,12 @@ struct simulation *new_simulation(const struct contact_map *native_map,
 
         s->temperature = temperature;
 
-        s->rng = rng;
+        /* s->rng = rng; */
+        s->rng = gsl_rng_alloc(gsl_rng_mt19937);
+        struct timeval tv;
+        gettimeofday(&tv, NULL);
+        printf("Seeding the random number generator with %l\n", tv.tv_usec);
+        gsl_rng_set(s->rng, tv.tv_usec);
 
         s->accepted = s->total = 0;
 
@@ -66,6 +71,8 @@ void delete_simulation(struct simulation *self)
                 fclose(self->X);
         if (self->protein != NULL)
                 delete_protein(self->protein);
+        if (self->rng != NULL)
+                gsl_rng_free(self->rng);
 
         free(self);
 }
@@ -110,7 +117,7 @@ void simulation_next_iteration(struct simulation *self)
         bool changed = protein_do_natural_movement(candidate, self->rng, self->next_atom);
         self->next_atom = (self->next_atom + 1) % self->protein->num_atoms;
 
-        const double U1 = compute_potential_energy(current, self);
+        const double U1 = self->energy;
         const double U2 = changed ? compute_potential_energy(candidate, self) : U1;
         const double DU = U2 - U1;
 
