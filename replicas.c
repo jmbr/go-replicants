@@ -39,6 +39,8 @@ struct replicas *new_replicas(struct protein *protein,
                 delete_replicas(r);
                 return NULL;
         }
+        if ((r->log = fopen("replicas.log", "a")) == NULL)
+                delete_replicas(r);
         for (size_t k = 0; k < r->num_replicas; k++) {
                 r->replica[k] = new_simulation(r->native_map, r->a,
                                                options->temperatures[k], r->rng);
@@ -65,15 +67,17 @@ void delete_replicas(struct replicas *self)
         for (size_t k = 0; k < self->num_replicas; k++)
                 if (self->replica[k] != NULL)
                         delete_simulation(self->replica[k]);
-        if (self->exchanges)
+        if (self->exchanges != NULL)
                 free(self->exchanges);
-        if (self->total)
+        if (self->total != NULL)
                 free(self->total);
-        if (self->native_map)
+        if (self->native_map != NULL)
                 delete_contact_map(self->native_map);
         /* XXX: If new_replica fails, protein will be deallocated. */
-        if (self->protein)
+        if (self->protein != NULL)
                 delete_protein(self->protein);
+        if (self->log != NULL)
+                fclose(self->log);
         free(self);
 }
 
@@ -127,7 +131,7 @@ void replicas_thermalize(struct replicas *self, size_t num_iters)
 {
         const size_t iters_per_cycle = self->protein->num_atoms;
 
-        dprintf("performing %u thermalization steps.\n", num_iters);
+        fprintf(self->log, "performing %u thermalization steps.\n", num_iters);
         
         for (size_t s = 0; s < num_iters; s++) {
                 size_t k;
@@ -142,7 +146,7 @@ void replicas_thermalize(struct replicas *self, size_t num_iters)
                         save_conformation(self);
         }
 
-        dprintf("done with the thermalization steps.\n");
+        fprintf(self->log, "done with the thermalization steps.\n");
 }
 
 void replicas_next_iteration(struct replicas *self)
@@ -152,14 +156,14 @@ void replicas_next_iteration(struct replicas *self)
         const size_t num_iters = 5000;
 
         if (self->num_replicas > 1) {
-                printf("attempting to exchange replicas.\n");
+                fprintf(self->log, "attempting to exchange replicas.\n");
                 for (k = gsl_rng_uniform_int(self->rng, 2);
                      k <= self->num_replicas - 2;
                      k += 2)
                 {
                         replicas_exchange(self, k);
                 }
-                printf("done with replica exchange.\n");
+                fprintf(self->log, "done with replica exchange.\n");
         }
 
         for (size_t s = 0; s < num_iters; s++) {
@@ -172,6 +176,8 @@ void replicas_next_iteration(struct replicas *self)
                         save_energy(self);
                 if (s % save_conformation_step == 0)
                         save_conformation(self);
+
+                fflush(self->log);
         }
 }
 
@@ -192,7 +198,7 @@ void replicas_exchange(struct replicas *self, size_t k)
         const double p = exp(DB*DU);
         const double r = gsl_rng_uniform(self->rng);
         if (r < p) {
-                printf("swapping replicas %u and %u.\n", k, k+1);
+                fprintf(self->log, "swapping replicas %u and %u.\n", k, k+1);
                 struct protein *x = s1->protein;
                 s1->protein = s2->protein;
                 s1->energy = U2;
@@ -202,8 +208,6 @@ void replicas_exchange(struct replicas *self, size_t k)
         }
 
         ++self->total[k];
-
-        fflush(stdout);
 }
 
 

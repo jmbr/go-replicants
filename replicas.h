@@ -13,6 +13,7 @@ struct replicas {
         size_t num_replicas;            /**< Number of replicas. */
         size_t *exchanges;              /**< Number of exchanges per pair of replicas. */
         size_t *total;                  /**< Number of attempted exchanges per pair of replicas. */
+        FILE *log;                      /**< Log file. */
         struct simulation *replica[];   /**< Array of replicas. */
 };
 
