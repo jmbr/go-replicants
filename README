@@ -1,0 +1,65 @@
+                                 Go Replicants!
+
+A molecular simulator of Go-type potentials
+
+1 Overview
+
+   Go Replicants! is a molecular simulator for proteins. It uses a replica
+   exchange Monte Carlo strategy to explore the energy surfaces of Go-type
+   potentials following the methodology explained in Thermodynamics of
+   Go-type models for protein folding. Prieto L., de Sancho D., Rey A. The
+   Journal of chemical physics. (2005) October; 123:154903.
+
+   This software is currently in alpha stage. Use at your own risk.
+
+   Results at different temperatures
+
+2 Prerequisites
+
+   You need a recent version (1.14 or above) of the GNU Scientific Library.
+   It is also recommended to have ATLAS and Gnuplot installed.
+
+3 License
+
+   This software is released under the GNU General Public License. See the
+   accompanying LICENSE file for details.
+
+4 Usage
+
+  4.1 Building from source code
+
+    1. Download the package by clicking here
+    2. Extract the source code with tar xvzf go-replicants-latest.tar.gz
+    3. cd go-replicants && mkdir build && cd build
+    4. cmake -L ../devel && make
+
+   This builds the binaries molecular-viewer and molecular-simulator.
+
+  4.2 Running a simulation
+
+   You need the structural data of a protein in XYZ format for
+   molecular-simulator to operate. Structural data downloaded in PDB format
+   from the Protein Data Bank can be converted to XYZ format using a
+   conversion script included in the scripts directory. To do the conversion
+   write:
+
+ ../scripts/pdb2xyz PROTEIN.pdb > PROTEIN.xyz
+              
+
+   Once the structural data is in the right format one can run a simulation
+   by executing
+
+ ./molecular-simulator -d D -a A -t T1 -t T2 ... -t TN PROTEIN.xyz
+              
+
+   In the previous command D and A stand respectively for the dmax and a
+   parameters of the potential energy function and T1, ..., TN are the
+   temperatures to be simulated (in dimensionless units). This produces two
+   kinds of files with extensions .dat and .xyz. The former contain values of
+   the potential energy function as the simulation proceeds and the latter
+   contain the corresponding spatial conformations of the protein.
+
+5 Bug reports
+
+   Please send bug reports and/or patches to the author's email address.
+   Go Replicants! Logo
