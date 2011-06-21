@@ -31,7 +31,7 @@ struct simulation *new_simulation(const struct contact_map *native_map,
         s->rng = gsl_rng_alloc(gsl_rng_mt19937);
         struct timeval tv;
         gettimeofday(&tv, NULL);
-        printf("Seeding the random number generator with %l\n", tv.tv_usec);
+        printf("Seeding the random number generator with %ld\n", (long) tv.tv_usec);
         gsl_rng_set(s->rng, tv.tv_usec);
 
         s->accepted = s->total = 0;
