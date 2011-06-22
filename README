@@ -28,7 +28,8 @@ A molecular simulator of Go-type potentials
 
   4.1 Building from source code
 
-    1. Download the package by clicking here
+    1. Download the package from
+       http://curio.mat.ucm.es/~jmbr/go-replicants/go-replicants-latest.tar.gz
     2. Extract the source code with tar xvzf go-replicants-latest.tar.gz
     3. cd go-replicants && mkdir build && cd build
     4. cmake -L ../devel && make
@@ -43,7 +44,7 @@ A molecular simulator of Go-type potentials
    conversion script included in the scripts directory. To do the conversion
    write:
 
- ../scripts/pdb2xyz PROTEIN.pdb > PROTEIN.xyz
+ ../pdb2xyz PROTEIN.pdb > PROTEIN.xyz
               
 
    Once the structural data is in the right format one can run a simulation
