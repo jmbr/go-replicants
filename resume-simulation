@@ -1,0 +1,32 @@
+#!/usr/bin/env python
+
+import sys
+
+def main(argv):
+    if len(argv) == 1:
+        print 'Usage: %s XYZ-FILE CONFORMATION-FILE [CONFORMATION-FILE ...]' % argv[0]
+        sys.exit(-1)
+
+    d_max = 0.0
+    a = 0.0
+    Ts = []
+    fs = argv[2:]
+    for f in fs:
+        if not f.endswith('.xyz'):
+            continue
+        f = f[:-4]                      # Drop the extension.
+        [r, s, t, u] = f.split('--')
+        T = float(s.split('-')[1])
+        d_max = float(t.split('-')[1])
+        a = float(u.split('-')[1])
+        Ts.append(T)
+    cmdline = './molecular-simulator --resume -d %2.5f -a %2.5f ' % (d_max, a)
+    for T in Ts:
+        cmdline += '-t %2.5f ' % T
+    cmdline += argv[1] + ' '
+    for f in fs:
+        cmdline += f + ' '
+    print cmdline
+
+if __name__ == '__main__':
+    main(sys.argv)

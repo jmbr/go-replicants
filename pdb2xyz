@@ -1,0 +1,30 @@
+#!/usr/bin/awk -f
+
+BEGIN {
+  num_atoms = 0;
+}
+
+$1 == "ATOM" && $3 == "CA" {
+  atoms[num_atoms,type] = $3;
+  for (i = 0; i < 3; i++)
+    atoms[num_atoms,i] = $(7+i);
+  ++num_atoms;
+}
+
+function get_label(path)
+{
+  ("basename " path) | getline filename;
+  split(filename, parts, ".");
+  return toupper(parts[1]);
+}
+
+END {
+  if (num_atoms > 0) {
+    print num_atoms;
+    print get_label(FILENAME);
+    for (a = 0; a < num_atoms; a++) {
+      printf("%s %g %g %g\n",
+             atoms[a,type], atoms[a,0], atoms[a,1], atoms[a,2]);
+    }
+  }
+}
